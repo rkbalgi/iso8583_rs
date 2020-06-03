@@ -1,5 +1,6 @@
 mod iso8583;
 
+
 fn main() {
     //let testvec = vec![1, 2, 3];
 
@@ -10,5 +11,8 @@ fn main() {
     for i in 1..193 {
         println!("{} {}", i, bmp.is_on(i))
     }
-    println!("{}",bmp.hex_string())
+    println!("{}", bmp.hex_string());
+
+    let iso_spec = iso8583::iso_spec::Spec("iso8583".to_string());
+    iso_spec.Parse(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9])?
 }

@@ -1,5 +1,3 @@
-use std::fmt::format;
-
 #[derive(Debug)]
 pub struct Bitmap {
     p_bmp: u64,
@@ -30,7 +28,7 @@ impl Bitmap {
     }
 
     pub fn hex_string(self: &Bitmap) -> String {
-        format!("{:16.0x}{:016.0x}{:16.0x}",self.p_bmp,self.s_bmp,self.t_bmp)
+        format!("{:016.0x}{:016.0x}{:016.0x}", self.p_bmp, self.s_bmp, self.t_bmp)
     }
 }
 
