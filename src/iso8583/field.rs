@@ -1,17 +1,30 @@
 use crate::iso8583::bitmap::Bitmap;
 use std::error::Error;
+use std::fmt;
 
-pub(crate) enum Encoding {
+pub enum Encoding {
     ASCII,
     EBCDIC,
     BINARY,
     BCD,
 }
 
+#[derive(Debug)]
+pub struct ParseError {
+    msg: String
+}
 
-pub trait Field: Sized {
-    fn parse(&self, in_buf: &Vec<u8>) -> Result<u32, dyn Error>;
-    fn assemble(&self, out_buf: &mut Vec<u8>) -> Result<u32, dyn Error>;
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "(iso8583:: parse-error: {})", self.msg)
+    }
+}
+
+
+pub trait Field {
+    fn name(&self) -> &String;
+    fn parse(&self, in_buf: &mut Vec<u8>) -> Result<u32, ParseError>;
+    fn assemble(&self, out_buf: &mut Vec<u8>) -> Result<u32, ParseError>;
 }
 
 pub struct FixedField {
@@ -21,47 +34,71 @@ pub struct FixedField {
 }
 
 impl Field for FixedField {
-    fn parse(&self, in_buf: &Vec<u8>) -> Result<u32, dyn Error> {
-        if in_buf.capacity() < self.len as usize {
-            print!("{}", in_buf.as_slice()[0..self.len]);
+    fn name(&self) -> &String {
+        &self.name
+    }
+
+    fn parse(self: &Self, in_buf: &mut Vec<u8>) -> Result<u32, ParseError> {
+        if self.len < in_buf.capacity() as u32 {
+
+            let mut f_data= Vec::new();
+            for i in 0..self.len {
+                f_data.push(in_buf.remove(0))
+            }
+
+            for i in f_data.iter() {
+                print!("{:?}", i);
+            }
+            println!("{:?}", " done ....");
             Ok(0)
         } else {
-            Err(format!("require {} but have {}", self.len, in_buf.capacity()))
+            Result::Err(ParseError { msg: format!("require {} but have {}", self.len, in_buf.capacity()) })
         }
     }
 
-    fn assemble(&self, out_buf: &mut Vec<u8>) -> Result<u32, dyn Error> {
+    fn assemble(self: &Self, out_buf: &mut Vec<u8>) -> Result<u32, ParseError> {
         unimplemented!()
     }
 }
 
 struct BmpField {
+    name: String,
     encoding: Encoding,
 }
 
 impl Field for BmpField {
-    fn parse(&self, _: Vec<u8>) -> Result<u32, dyn Error> {
+    fn name(&self) -> &String {
+        &self.name
+    }
+
+    fn parse(&self, _: &mut Vec<u8>) -> Result<u32, ParseError> {
         unimplemented!()
     }
 
-    fn assemble(&self, _: &mut Vec<u8>) -> Result<u32, dyn Error> {
+    fn assemble(&self, _: &mut Vec<u8>) -> Result<u32, ParseError> {
         unimplemented!()
     }
 }
 
 struct VarField {
     //number of bytes in the length indicator
+    name: String,
     len: u32,
     len_encoding: Encoding,
     encoding: Encoding,
 }
 
-impl Field for VarField {
-    fn parse(&self, _: Vec<u8>) -> Result<u32, dyn Error> {
+impl Field for VarField
+{
+    fn name(&self) -> &String {
+        &self.name
+    }
+
+    fn parse(&self, _: &mut Vec<u8>) -> Result<u32, ParseError> {
         unimplemented!()
     }
 
-    fn assemble(&self, _: &mut Vec<u8>) -> Result<u32, dyn Error> {
+    fn assemble(&self, _: &mut Vec<u8>) -> Result<u32, ParseError> {
         unimplemented!()
     }
 }

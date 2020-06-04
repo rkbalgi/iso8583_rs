@@ -14,5 +14,5 @@ fn main() {
     println!("{}", bmp.hex_string());
 
     let iso_spec = iso8583::iso_spec::Spec("iso8583".to_string());
-    iso_spec.Parse(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9])?
+    iso_spec.parse(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]).expect("parsing failed!");
 }
