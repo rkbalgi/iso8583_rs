@@ -21,7 +21,7 @@ impl fmt::Display for ParseError {
 }
 
 
-pub trait Field {
+pub trait Field:Sync {
     fn name(&self) -> &String;
     fn parse(&self, in_buf: &mut Vec<u8>) -> Result<u32, ParseError>;
     fn assemble(&self, out_buf: &mut Vec<u8>) -> Result<u32, ParseError>;

@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate lazy_static;
+
 mod iso8583;
 
 
@@ -13,6 +16,7 @@ fn main() {
     }
     println!("{}", bmp.hex_string());
 
-    let iso_spec = iso8583::iso_spec::Spec("iso8583".to_string());
-    iso_spec.parse(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]).expect("parsing failed!");
+    let iso_spec = iso8583::iso_spec::Spec("SampleSpec".to_string());
+
+    iso_spec.parse(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,0]).expect("parsing failed!");
 }
