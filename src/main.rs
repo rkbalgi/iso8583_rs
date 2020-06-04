@@ -1,5 +1,7 @@
 #[macro_use]
 extern crate lazy_static;
+extern crate hex;
+extern crate byteorder;
 
 mod iso8583;
 
@@ -16,7 +18,8 @@ fn main() {
     }
     println!("{}", bmp.hex_string());
 
-    let iso_spec = iso8583::iso_spec::Spec("SampleSpec".to_string());
+    let iso_spec = iso8583::iso_spec::Spec("SampleSpec");
 
-    iso_spec.parse(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,0]).expect("parsing failed!");
+    let iso_msg = iso_spec.parse(hex::decode("00010203040506070809000101020304050607080900").expect("failed to decode hex")).expect("parsing failed!");
+    println!("{:?}",iso_msg.fd_map)
 }
