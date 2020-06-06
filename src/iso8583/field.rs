@@ -1,10 +1,11 @@
 use crate::iso8583::bitmap::new_bmp;
-use crate::iso8583::bitmap::Bitmap;
+
 use crate::iso8583::iso_spec::IsoMsg;
-use std::error::Error;
+
 use std::fmt;
 use byteorder;
 use byteorder::ByteOrder;
+use std::io::{Write, repeat};
 
 
 pub enum Encoding {
@@ -48,12 +49,13 @@ impl Field for FixedField {
     }
 
     fn parse(self: &Self, in_buf: &mut Vec<u8>, iso_msg: &mut IsoMsg) -> Result<u32, ParseError> {
+        println!("before_parse:: {}", hex::encode(in_buf.as_slice()));
         if self.len < in_buf.capacity() as u32 {
             let mut f_data = Vec::new();
-            for i in 0..self.len {
-                f_data.push(in_buf.pop().expect(""))
+            for _ in 0..self.len {
+                f_data.push(in_buf.remove(0));
             }
-            println!("parsed-data: {}", hex::encode(f_data.iter()));
+            println!("parsed-data: {}", hex::encode(f_data.as_slice()));
             iso_msg.fd_map.insert(self.name.clone(), f_data);
 
             Ok(0)
@@ -74,6 +76,26 @@ impl Field for FixedField {
 pub struct BmpField {
     pub name: String,
     pub encoding: Encoding,
+    pub children: Vec<Box<dyn Field>>,
+}
+
+
+impl BmpField{
+
+    pub fn by_position(&self, pos: u32) -> Result<&Box<dyn Field>, ParseError> {
+        let opt = &(self.children).iter().filter(|f| -> bool{
+            if f.as_ref().position() == pos {
+                true
+            } else {
+                false
+            }
+        }).next();
+
+        match opt {
+            Some(f) => Ok(f),
+            None => Err(ParseError { msg: format!("position {} not defined", pos) }),
+        }
+    }
 }
 
 impl Field for BmpField {
@@ -84,8 +106,8 @@ impl Field for BmpField {
     fn parse(&self, in_buf: &mut Vec<u8>, iso_msg: &mut IsoMsg) -> Result<u32, ParseError> {
         if in_buf.capacity() as u32 >= 8 {
             let mut f_data = Vec::new();
-            for i in 0..8 {
-                f_data.push(in_buf.pop().expect(""))
+            for _ in 0..8 {
+                f_data.push(in_buf.remove(0));
             }
             println!("parsed-data: {} := {}", self.name, hex::encode(f_data.iter()));
 
@@ -97,13 +119,15 @@ impl Field for BmpField {
             iso_msg.fd_map.insert(self.name.clone(), f_data);
             iso_msg.bmp = bmp;
 
+
             for i in 2..193 {
                 if iso_msg.bmp.is_on(i) {
-                    return match iso_msg.spec.by_position(i) {
+                    let is_present = self.by_position(i);
+                    match is_present {
                         Ok(f) => match f.parse(in_buf, iso_msg) {
                             Ok(_) => Ok(0),
                             Err(e) => Err(e),
-                        }
+                        },
                         Err(e) => Err(e),
                     };
                 }
@@ -119,8 +143,11 @@ impl Field for BmpField {
         unimplemented!()
     }
 
+
+
+
     fn position(&self) -> u32 {
-        unimplemented!()
+        0
     }
 }
 

@@ -3,6 +3,8 @@ extern crate lazy_static;
 extern crate hex;
 extern crate byteorder;
 
+use std::io::{Read, Write};
+
 mod iso8583;
 
 
@@ -20,6 +22,21 @@ fn main() {
 
     let iso_spec = iso8583::iso_spec::Spec("SampleSpec");
 
-    let iso_msg = iso_spec.parse(hex::decode("00010203040506070809000101020304050607080900").expect("failed to decode hex")).expect("parsing failed!");
-    println!("{:?}",iso_msg.fd_map)
+    //31313030 6024000000000000 123456789101 004000 779581 2204
+    let mut raw_msg: Vec<u8> = Vec::new();
+    "1100".as_bytes().read_to_end(&mut raw_msg);
+    raw_msg.write_all(hex::decode("6024000000000000").expect("failed to decode bmp").as_slice());
+    "123456789101".as_bytes().read_to_end(&mut raw_msg);
+    "004000".as_bytes().read_to_end(&mut raw_msg);
+    "779581".as_bytes().read_to_end(&mut raw_msg);
+    "2204".as_bytes().read_to_end(&mut raw_msg);
+
+    println!("raw iso msg = {}", hex::encode(raw_msg.as_slice()));
+    println!("raw iso msg = {}", hex::encode(raw_msg.as_slice()));
+
+    match iso_spec.parse(raw_msg) {
+        Ok(iso_msg) => println!("{:?}", iso_msg.fd_map),
+        Err(e) => panic!(e),
+    }
+
 }
