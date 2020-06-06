@@ -1,7 +1,5 @@
 use crate::iso8583::bitmap::new_bmp;
-
 use crate::iso8583::iso_spec::IsoMsg;
-
 use std::fmt;
 use byteorder;
 use byteorder::ByteOrder;
@@ -80,8 +78,7 @@ pub struct BmpField {
 }
 
 
-impl BmpField{
-
+impl BmpField {
     pub fn by_position(&self, pos: u32) -> Result<&Box<dyn Field>, ParseError> {
         let opt = &(self.children).iter().filter(|f| -> bool{
             if f.as_ref().position() == pos {
@@ -114,6 +111,10 @@ impl Field for BmpField {
 
             let b1 = byteorder::BigEndian::read_u64(f_data.as_slice());
 
+            //TODO:: support secondary and tertiary bitmaps
+            if b1 & 0x80 == 0x80 {
+                unimplemented!("include support for secondary/tertiary bitmaps...");
+            }
 
             let bmp = new_bmp(b1, 0, 0);
             iso_msg.fd_map.insert(self.name.clone(), f_data);
@@ -144,8 +145,6 @@ impl Field for BmpField {
     }
 
 
-
-
     fn position(&self) -> u32 {
         0
     }
@@ -160,15 +159,50 @@ pub struct VarField {
     pub position: u32,
 }
 
+
+impl VarField {
+    fn data_len(&self, data: &Vec<u8>) -> usize
+    {
+        match self.len_encoding {
+            Encoding::ASCII => {
+                String::from_utf8(data.clone()).expect("").parse::<usize>().unwrap()
+            }
+            _ => unimplemented!("only ascii supported for length encoding on var fields"),
+        }
+    }
+}
+
 impl Field for VarField
 {
     fn name(&self) -> &String {
         &self.name
     }
 
-    fn parse(&self, _: &mut Vec<u8>, _: &mut IsoMsg) -> Result<u32, ParseError> {
-        unimplemented!()
+    fn parse(&self, in_buf: &mut Vec<u8>, iso_msg: &mut IsoMsg) -> Result<u32, ParseError> {
+        println!("before_parse:: {}", hex::encode(in_buf.as_slice()));
+        if self.len < in_buf.capacity() as u32 {
+            let mut len_data = Vec::with_capacity(self.len as usize);
+
+            for _ in 0..self.len {
+                (len_data).push(in_buf.remove(0));
+            }
+            println!("parsed-data (len-ind) : {}", hex::encode(&len_data));
+
+
+            let data_len = self.data_len(&len_data);
+            let mut f_data = Vec::with_capacity(data_len as usize);
+            for _ in 0..data_len {
+                (f_data).push(in_buf.remove(0));
+            }
+            iso_msg.fd_map.insert(self.name.clone(), f_data);
+
+
+            Ok(0)
+        } else {
+            Result::Err(ParseError { msg: format!("require {} but have {}", self.len, in_buf.capacity()) })
+        }
     }
+
 
     fn assemble(&self, _: &mut Vec<u8>) -> Result<u32, ParseError> {
         unimplemented!()

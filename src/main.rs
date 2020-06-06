@@ -9,34 +9,34 @@ mod iso8583;
 
 
 fn main() {
-    //let testvec = vec![1, 2, 3];
 
-    println!("Hello, world!");
-    // println!("{:?} {:?}", testvec, iso8583::bitmap::new_bmp());
+    let iso_spec = iso8583::iso_spec::spec("SampleSpec");
 
-    let bmp = &iso8583::bitmap::new_bmp(0x7e02030400000001, 0, 0x8000000000000001);
-    for i in 1..193 {
-        println!("{} {}", i, bmp.is_on(i))
-    }
-    println!("{}", bmp.hex_string());
 
-    let iso_spec = iso8583::iso_spec::Spec("SampleSpec");
-
-    //31313030 6024000000000000 123456789101 004000 779581 2204
+    // build a raw iso message as per "SampleSpec"
     let mut raw_msg: Vec<u8> = Vec::new();
+
+    // message type
     "1100".as_bytes().read_to_end(&mut raw_msg);
+    //bitmap
     raw_msg.write_all(hex::decode("6024000000000000").expect("failed to decode bmp").as_slice());
+
+    //pan - with length indicator and data
+    "12".as_bytes().read_to_end(&mut raw_msg);
     "123456789101".as_bytes().read_to_end(&mut raw_msg);
+
+    //proc code
     "004000".as_bytes().read_to_end(&mut raw_msg);
+    //stan
     "779581".as_bytes().read_to_end(&mut raw_msg);
+    //expiration date
     "2204".as_bytes().read_to_end(&mut raw_msg);
 
     println!("raw iso msg = {}", hex::encode(raw_msg.as_slice()));
-    println!("raw iso msg = {}", hex::encode(raw_msg.as_slice()));
+
 
     match iso_spec.parse(raw_msg) {
-        Ok(iso_msg) => println!("{:?}", iso_msg.fd_map),
+        Ok(iso_msg) => println!("{}", iso_msg),
         Err(e) => panic!(e),
     }
-
 }

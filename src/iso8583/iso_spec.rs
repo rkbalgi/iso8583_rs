@@ -1,11 +1,9 @@
-//#[macro_use]
-//extern crate lazy_static;
-
 use crate::iso8583::field::{FixedField, VarField, BmpField, Field, Encoding, ParseError};
 use crate::iso8583::bitmap;
 
 
 use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
 
 
 pub struct Spec {
@@ -25,30 +23,38 @@ impl IsoMsg {
     }
 }
 
+impl Display for IsoMsg {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        let mut res = "".to_string();
+        for (f, v) in &(self.fd_map) {
+            res = res + format!("\n{:20.40}: {}", f, hex::encode(v.as_slice())).as_str();
+        }
+        f.write_str(&res);
+        Ok(())
+    }
+}
+
+
 
 
 lazy_static! {
-static ref all_specs: std::collections::HashMap<String,Spec> ={
+static ref ALL_SPECS: std::collections::HashMap<String,Spec> ={
 
     let mut specs=HashMap::new();
 
-    let fields: Vec<Box<dyn Field>> = vec![
+    specs.insert("SampleSpec".to_string(),Spec {
+        name: "SampleSpec".to_string(),
+        fields: vec![
             Box::new(FixedField { name: "message_type".to_string(), len: 4, encoding: Encoding::ASCII ,position: 0}),
             Box::new(BmpField { name: "bitmap".to_string(), encoding: Encoding::ASCII ,
-                 children: vec![Box::new(FixedField { name: "pan".to_string(), len: 12, encoding: Encoding::ASCII, position:2 }),
-                                //Box::new(VarField { name: "pan".to_string(), len: 2, encoding: Encoding::ASCII, len_encoding: Encoding::ASCII, position:2 }),
+                 children: vec![
+                                Box::new(VarField { name: "pan".to_string(), len: 2, encoding: Encoding::ASCII, len_encoding: Encoding::ASCII, position:2 }),
                                 Box::new(FixedField { name: "proc_code".to_string(), len: 6, encoding: Encoding::ASCII, position:3 }),
                                 Box::new(FixedField { name: "stan".to_string(), len: 6, encoding: Encoding::ASCII, position:11 }),
                                 Box::new(FixedField { name: "expiration_date".to_string(), len: 4, encoding: Encoding::ASCII, position: 14 }),
                                ]}),
 
-        ];
-
-
-
-    specs.insert("SampleSpec".to_string(),Spec {
-        name: "SampleSpec".to_string(),
-        fields: fields,
+        ],
     });
 
     specs
@@ -56,8 +62,8 @@ static ref all_specs: std::collections::HashMap<String,Spec> ={
 }
 
 
-pub fn Spec(name: &str) -> &'static Spec {
-    return all_specs.get(name).unwrap();
+pub fn spec(name: &str) -> &'static Spec {
+    return ALL_SPECS.get(name).unwrap();
 }
 
 impl Spec {
@@ -70,10 +76,14 @@ impl Spec {
 
         for f in self.fields() {
             println!("parsing field : {}", f.name());
-            match f.parse(&mut cp_data, &mut iso_msg) {
+            let res = match f.parse(&mut cp_data, &mut iso_msg) {
                 Err(e) => Result::Err(e),
                 Ok(r) => Result::Ok(r),
             };
+
+            if res.is_err() {
+                return Result::Err(res.err().unwrap());
+            }
         }
 
         if cp_data.len() > 0 {
