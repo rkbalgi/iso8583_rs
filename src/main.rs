@@ -1,3 +1,4 @@
+//#![feature(vec_drain_as_slice)]
 #[macro_use]
 extern crate lazy_static;
 extern crate hex;
@@ -41,7 +42,7 @@ fn main() {
         Err(e) => panic!(e),
     }
 
-    let server: IsoServer  = match crate::iso8583::server::new("localhost:6666".to_string()) {
+    let server: IsoServer = match crate::iso8583::server::new("localhost:6666".to_string()) {
         Ok(server) => {
             server
         }

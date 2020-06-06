@@ -1,41 +1,71 @@
-use std::net::{Ipv4Addr, ToSocketAddrs, SocketAddr, TcpStream};
-use std::error::Error;
+use std::net::{ToSocketAddrs, SocketAddr, TcpStream};
 use std::io::Read;
-
+use byteorder::ByteOrder;
+use std::sync::Arc;
 
 pub struct IsoServerError {
     msg: String
 }
 
-
+#[derive(Copy, Clone)]
 pub struct IsoServer {
     sock_addr: SocketAddr
 }
 
 impl IsoServer {
     pub fn start(&self) {
-        let addr = self.sock_addr.clone();
+        let iso_serv=*self;
 
         std::thread::spawn(move || {
-            let listener = std::net::TcpListener::bind(addr).unwrap();
+            let listener = std::net::TcpListener::bind(iso_serv.sock_addr).unwrap();
 
             for stream in listener.incoming() {
                 let client = stream.unwrap();
-                println!("Accepted new connection .. {:?}", &client.local_addr());
-                new_client(client);
+                println!("Accepted new connection .. {:?}", &client.peer_addr());
+                new_client(iso_serv, client);
             }
         });
     }
 }
 
-fn new_client(stream: TcpStream) {
+
+fn new_client(iso_server: IsoServer, stream: TcpStream) {
     std::thread::spawn(move || {
-        let mut buf: [u8; 1024] = [0; 1024];
+        let mut buf: [u8; 512] = [0; 512];
+
+        let mut reading_mli = true;
+        let mut in_buf: Vec<u8> = Vec::with_capacity(512);
+        let mut mli: u16 = 0;
+
         loop {
+            //TODO:: MLI is assumed to be 2E for now
+
             match (&stream).read(&mut buf[..]) {
                 Ok(n) => {
                     if n > 0 {
-                        println!("read {} from {}", hex::encode(&buf[0..n]), stream.local_addr().unwrap().to_string());
+                        println!("read {} from {}", hex::encode(&buf[0..n]), stream.peer_addr().unwrap().to_string());
+                        in_buf.append(&mut buf[0..n].to_vec());
+
+
+                        while in_buf.len() > 0 {
+                            if reading_mli {
+                                if in_buf.len() >= 2 {
+                                    println!("while reading mli .. {}", hex::encode(&in_buf.as_slice()));
+                                    mli = byteorder::BigEndian::read_u16(&in_buf[0..2]);
+                                    in_buf.drain(0..2 as usize).collect::<Vec<u8>>();
+                                    reading_mli = false;
+                                }
+                            } else {
+                                //reading data
+                                if mli > 0 && in_buf.len() >= mli as usize {
+                                    let data = &in_buf[0..mli as usize];
+                                    println!("received request len = {}  : data = {}", mli, hex::encode(data));
+                                    in_buf.drain(0..mli as usize).collect::<Vec<u8>>();
+                                    mli = 0;
+                                    reading_mli = true;
+                                }
+                            }
+                        }
                     } else {
                         //socket may have been closed??
                         println!("client socket closed : {}", stream.peer_addr().unwrap().to_string());

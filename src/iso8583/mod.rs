@@ -1,4 +1,4 @@
-
+#![feature(vec_drain_as_slice)]
 pub mod bitmap;
 pub mod field;
 pub mod iso_spec;
