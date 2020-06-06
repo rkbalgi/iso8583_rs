@@ -6,6 +6,30 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 
 
+lazy_static! {
+static ref ALL_SPECS: std::collections::HashMap<String,Spec> ={
+
+    let mut specs=HashMap::new();
+
+    specs.insert("SampleSpec".to_string(),Spec {
+        name: "SampleSpec".to_string(),
+        fields: vec![
+            Box::new(FixedField { name: "message_type".to_string(), len: 4, encoding: Encoding::ASCII ,position: 0}),
+            Box::new(BmpField { name: "bitmap".to_string(), encoding: Encoding::ASCII ,
+                 children: vec![
+                                Box::new(VarField { name: "pan".to_string(), len: 2, encoding: Encoding::ASCII, len_encoding: Encoding::ASCII, position:2 }),
+                                Box::new(FixedField { name: "proc_code".to_string(), len: 6, encoding: Encoding::ASCII, position:3 }),
+                                Box::new(FixedField { name: "stan".to_string(), len: 6, encoding: Encoding::ASCII, position:11 }),
+                                Box::new(FixedField { name: "expiration_date".to_string(), len: 4, encoding: Encoding::ASCII, position: 14 }),
+                               ]}),
+
+        ],
+    });
+
+    specs
+};
+}
+
 pub struct Spec {
     name: String,
     fields: Vec<Box<dyn Field>>,
@@ -37,29 +61,7 @@ impl Display for IsoMsg {
 
 
 
-lazy_static! {
-static ref ALL_SPECS: std::collections::HashMap<String,Spec> ={
 
-    let mut specs=HashMap::new();
-
-    specs.insert("SampleSpec".to_string(),Spec {
-        name: "SampleSpec".to_string(),
-        fields: vec![
-            Box::new(FixedField { name: "message_type".to_string(), len: 4, encoding: Encoding::ASCII ,position: 0}),
-            Box::new(BmpField { name: "bitmap".to_string(), encoding: Encoding::ASCII ,
-                 children: vec![
-                                Box::new(VarField { name: "pan".to_string(), len: 2, encoding: Encoding::ASCII, len_encoding: Encoding::ASCII, position:2 }),
-                                Box::new(FixedField { name: "proc_code".to_string(), len: 6, encoding: Encoding::ASCII, position:3 }),
-                                Box::new(FixedField { name: "stan".to_string(), len: 6, encoding: Encoding::ASCII, position:11 }),
-                                Box::new(FixedField { name: "expiration_date".to_string(), len: 4, encoding: Encoding::ASCII, position: 14 }),
-                               ]}),
-
-        ],
-    });
-
-    specs
-};
-}
 
 
 pub fn spec(name: &str) -> &'static Spec {
