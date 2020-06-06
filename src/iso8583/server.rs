@@ -9,27 +9,29 @@ pub struct IsoServerError {
 
 #[derive(Copy, Clone)]
 pub struct IsoServer {
-    sock_addr: SocketAddr
+    sock_addr: SocketAddr,
+    spec: crate::iso8583::iso_spec::Spec,
 }
 
 impl IsoServer {
     pub fn start(&self) {
-        let iso_serv=*self;
+        //let iso_serv=*self;
+        let cp = Arc::new(*self);
 
         std::thread::spawn(move || {
-            let listener = std::net::TcpListener::bind(iso_serv.sock_addr).unwrap();
+            let listener = std::net::TcpListener::bind(cp.sock_addr).unwrap();
 
             for stream in listener.incoming() {
                 let client = stream.unwrap();
                 println!("Accepted new connection .. {:?}", &client.peer_addr());
-                new_client(iso_serv, client);
+                new_client(&cp, client);
             }
         });
     }
 }
 
 
-fn new_client(iso_server: IsoServer, stream: TcpStream) {
+fn new_client(iso_server: &IsoServer, stream: TcpStream) {
     std::thread::spawn(move || {
         let mut buf: [u8; 512] = [0; 512];
 

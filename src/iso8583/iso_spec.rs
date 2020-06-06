@@ -30,11 +30,13 @@ static ref ALL_SPECS: std::collections::HashMap<String,Spec> ={
 };
 }
 
+// Spec is the definition of the spec - layout of fields etc..
 pub struct Spec {
     name: String,
     fields: Vec<Box<dyn Field>>,
 }
 
+// IsoMsg represents a parsed message for a given spec
 pub struct IsoMsg {
     pub spec: &'static Spec,
     pub fd_map: std::collections::HashMap<String, Vec<u8>>,
@@ -57,11 +59,6 @@ impl Display for IsoMsg {
         Ok(())
     }
 }
-
-
-
-
-
 
 
 pub fn spec(name: &str) -> &'static Spec {
