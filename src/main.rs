@@ -4,12 +4,13 @@ extern crate hex;
 extern crate byteorder;
 
 use std::io::{Read, Write};
+use std::time::Duration;
+use crate::iso8583::server::IsoServer;
 
 mod iso8583;
 
 
 fn main() {
-
     let iso_spec = iso8583::iso_spec::spec("SampleSpec");
 
 
@@ -39,4 +40,17 @@ fn main() {
         Ok(iso_msg) => println!("{}", iso_msg),
         Err(e) => panic!(e),
     }
+
+    let server: IsoServer  = match crate::iso8583::server::new("localhost:6666".to_string()) {
+        Ok(server) => {
+            server
+        }
+        Err(e) => {
+            panic!(e)
+        }
+    };
+    server.start();
+
+
+    std::thread::sleep(Duration::from_secs(1000));
 }

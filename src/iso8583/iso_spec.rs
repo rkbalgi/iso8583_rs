@@ -1,4 +1,4 @@
-use crate::iso8583::field::{FixedField, VarField, BmpField, Field, Encoding, ParseError};
+use crate::iso8583::field::{FixedField, VarField, Field, Encoding, ParseError};
 use crate::iso8583::bitmap;
 
 
@@ -15,7 +15,7 @@ static ref ALL_SPECS: std::collections::HashMap<String,Spec> ={
         name: "SampleSpec".to_string(),
         fields: vec![
             Box::new(FixedField { name: "message_type".to_string(), len: 4, encoding: Encoding::ASCII ,position: 0}),
-            Box::new(BmpField { name: "bitmap".to_string(), encoding: Encoding::ASCII ,
+            Box::new(bitmap::BmpField { name: "bitmap".to_string(), encoding: Encoding::ASCII ,
                  children: vec![
                                 Box::new(VarField { name: "pan".to_string(), len: 2, encoding: Encoding::ASCII, len_encoding: Encoding::ASCII, position:2 }),
                                 Box::new(FixedField { name: "proc_code".to_string(), len: 6, encoding: Encoding::ASCII, position:3 }),
