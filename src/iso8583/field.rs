@@ -1,5 +1,6 @@
 use crate::iso8583::iso_spec::IsoMsg;
 use std::fmt;
+use crate::iso8583::field::Encoding::ASCII;
 
 pub enum Encoding {
     ASCII,
@@ -27,6 +28,8 @@ pub trait Field: Sync {
     fn assemble(&self, out_buf: &mut Vec<u8>) -> Result<u32, ParseError>;
 
     fn position(&self) -> u32;
+    fn child_by_pos(&self, pos: u32) -> &dyn Field;
+    fn to_string(&self, data: &Vec<u8>) -> String;
 }
 
 pub struct FixedField {
@@ -64,8 +67,22 @@ impl Field for FixedField {
     fn position(&self) -> u32 {
         return self.position;
     }
-}
 
+    fn child_by_pos(&self, pos: u32) -> &dyn Field {
+        unimplemented!()
+    }
+
+    fn to_string(&self, data: &Vec<u8>) -> String {
+        match self.encoding {
+            ASCII => {
+                String::from_utf8(data.clone()).unwrap()
+            }
+            _ => {
+                hex::encode(data.as_slice())
+            }
+        }
+    }
+}
 
 
 pub struct VarField {
@@ -128,6 +145,21 @@ impl Field for VarField
 
     fn position(&self) -> u32 {
         return self.position;
+    }
+
+    fn child_by_pos(&self, pos: u32) -> &dyn Field {
+        unimplemented!()
+    }
+
+    fn to_string(&self, data: &Vec<u8>) -> String {
+        match self.encoding {
+            ASCII => {
+                String::from_utf8(data.clone()).unwrap()
+            }
+            _ => {
+                hex::encode(data.as_slice())
+            }
+        }
     }
 }
 

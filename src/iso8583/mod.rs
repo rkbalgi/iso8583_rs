@@ -5,3 +5,8 @@ pub mod iso_spec;
 pub mod server;
 mod test_tcp_client;
 
+
+#[derive(Debug)]
+pub struct IsoError{
+    pub msg: String,
+}

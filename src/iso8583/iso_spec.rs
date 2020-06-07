@@ -1,9 +1,10 @@
 use crate::iso8583::field::{FixedField, VarField, Field, Encoding, ParseError};
-use crate::iso8583::bitmap;
+use crate::iso8583::{bitmap, IsoError};
 
 
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
+use crate::iso8583::server::IsoServerError;
 
 
 lazy_static! {
@@ -36,6 +37,12 @@ pub struct Spec {
     fields: Vec<Box<dyn Field>>,
 }
 
+impl Spec {
+    pub fn name(&self) -> &String {
+        &self.name
+    }
+}
+
 // IsoMsg represents a parsed message for a given spec
 pub struct IsoMsg {
     pub spec: &'static Spec,
@@ -47,7 +54,28 @@ impl IsoMsg {
     pub fn Spec(&self) -> &'static Spec {
         self.spec
     }
+
+    pub fn get_field_value(&self, pos: u32) -> Result<String, IsoError> {
+        let f = self.spec.fields.iter().find(|f| -> bool {
+            if f.name() == "Bitmap" {
+                true
+            } else {
+                false
+            }
+        }).unwrap();
+
+        let cf = f.child_by_pos(pos);
+        match self.fd_map.get(cf.name()) {
+            None => {
+                Err(IsoError { msg: format!("no value for field at position {}", pos) })
+            }
+            Some(v) => {
+                Ok(cf.to_string(v))
+            }
+        }
+    }
 }
+
 
 impl Display for IsoMsg {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {

@@ -1,4 +1,4 @@
-use crate::iso8583::field::{Field,ParseError,Encoding};
+use crate::iso8583::field::{Field, ParseError, Encoding};
 use byteorder::ByteOrder;
 
 #[derive(Debug)]
@@ -113,5 +113,19 @@ impl Field for BmpField {
 
     fn position(&self) -> u32 {
         0
+    }
+
+    fn child_by_pos(&self, pos: u32) -> &dyn Field {
+        self.children.iter().find(|f| -> bool {
+            if f.position() == pos {
+                true
+            } else {
+                false
+            }
+        }).unwrap().as_ref()
+    }
+
+    fn to_string(&self, _: &Vec<u8>) -> String {
+        unimplemented!()
     }
 }
