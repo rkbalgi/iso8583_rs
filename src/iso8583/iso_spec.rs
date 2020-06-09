@@ -72,7 +72,7 @@ pub struct IsoMsg {
 }
 
 impl IsoMsg {
-    pub fn Spec(&self) -> &'static Spec {
+    pub fn spec(&self) -> &'static Spec {
         self.spec
     }
 
@@ -105,7 +105,7 @@ impl Display for IsoMsg {
             let field = self.spec.field_by_name(f).unwrap();
             res = res + format!("\n{:20.40}: {} ", f, field.to_string(v)).as_str();
         }
-        f.write_str(&res);
+        f.write_str(&res).unwrap();
         Ok(())
     }
 }

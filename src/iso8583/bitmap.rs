@@ -90,7 +90,7 @@ impl Field for BmpField {
             for i in 2..193 {
                 if iso_msg.bmp.is_on(i) {
                     let is_present = self.by_position(i);
-                    match is_present {
+                    match match is_present {
                         Ok(f) => {
                             debug!("parsing field - {}", f.name());
                             match f.parse(in_buf, iso_msg) {
@@ -99,7 +99,13 @@ impl Field for BmpField {
                             }
                         }
                         Err(e) => Err(e),
-                    };
+                    }
+                    {
+                        Err(e) => {
+                            return Err(e);
+                        }
+                        _ => {}
+                    }
                 }
             }
 

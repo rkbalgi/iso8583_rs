@@ -1,7 +1,7 @@
 use std::net::{ToSocketAddrs, SocketAddr, TcpStream};
 use std::io::Read;
 use byteorder::ByteOrder;
-use std::sync::Arc;
+
 use crate::iso8583::iso_spec::{IsoMsg, Spec};
 use log;
 
@@ -38,7 +38,7 @@ pub struct IsoServer {
 impl IsoServer {
     pub fn start(&self) {
         //let iso_serv=*self;
-        let cp=*self;
+        let cp = *self;
 
         std::thread::spawn(move || {
             let listener = std::net::TcpListener::bind(cp.sock_addr).unwrap();
@@ -76,7 +76,7 @@ fn new_client(iso_server: IsoServer, stream: TcpStream) {
                                 if in_buf.len() >= 2 {
                                     trace!("while reading mli .. {}", hex::encode(&in_buf.as_slice()));
                                     mli = byteorder::BigEndian::read_u16(&in_buf[0..2]);
-                                    in_buf.drain(0..2 as usize).collect::<Vec<u8>>();
+                                    in_buf.drain(0..2 as usize).for_each(drop);
                                     reading_mli = false;
                                 }
                             } else {
@@ -86,7 +86,7 @@ fn new_client(iso_server: IsoServer, stream: TcpStream) {
                                     debug!("received request len = {}  : data = {}", mli, hex::encode(data));
                                     iso_server.msg_processor.process(&iso_server, data.to_vec());
                                     //TODO:: get the response and respond
-                                    in_buf.drain(0..mli as usize).collect::<Vec<u8>>();
+                                    in_buf.drain(0..mli as usize).for_each(drop);
                                     mli = 0;
                                     reading_mli = true;
                                 }
@@ -99,7 +99,7 @@ fn new_client(iso_server: IsoServer, stream: TcpStream) {
                     }
                 }
                 Err(e) => {
-                    error!("client socket_err: {}", stream.peer_addr().unwrap().to_string());
+                    error!("client socket_err: {} {}", stream.peer_addr().unwrap().to_string(), e.to_string());
                     return;
                 }
             }
