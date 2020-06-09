@@ -3,14 +3,12 @@ mod tests {
     use std::net::TcpStream;
     use std::io::{Write, Read};
     use std::time::Duration;
-    use byteorder::WriteBytesExt;
+    use byteorder::{WriteBytesExt, ReadBytesExt};
     use byteorder::ByteOrder;
 
 
-
-
     #[test]
-    fn test_send_recv_iso() ->std::io::Result<()>{
+    fn test_send_recv_iso() -> std::io::Result<()> {
         let mut raw_msg: Vec<u8> = Vec::new();
 
         //make space for mli (swapped later)
@@ -37,7 +35,7 @@ mod tests {
         "2204".as_bytes().read_to_end(&mut raw_msg);
 
         let mut mli: [u8; 2] = [0; 2];
-        byteorder::BigEndian::write_u16(&mut mli[..], raw_msg.len() as u16-2);
+        byteorder::BigEndian::write_u16(&mut mli[..], raw_msg.len() as u16 - 2);
 
         std::mem::swap(&mut mli[0], &mut raw_msg[0]);
         std::mem::swap(&mut mli[1], &mut raw_msg[1]);
@@ -47,7 +45,19 @@ mod tests {
         let mut client = TcpStream::connect("localhost:6666")?;
 
         client.write_all(raw_msg.as_slice())?;
+        client.flush();
 
-        client.flush()
+        let len = client.read_u16::<byteorder::BigEndian>().unwrap();
+        println!("received response with {} bytes", len);
+        let mut out_buf = Vec::with_capacity(len as usize);
+        match client.read_exact(out_buf.as_mut_slice()) {
+            Ok(()) => {
+                println!("received {}", hex::encode(out_buf.as_slice()))
+            }
+            Err(e) => {
+                panic!(e)
+            }
+        }
+        Ok(())
     }
 }

@@ -1,5 +1,5 @@
 use std::net::{ToSocketAddrs, SocketAddr, TcpStream};
-use std::io::Read;
+use std::io::{Read, Write};
 use byteorder::ByteOrder;
 
 use crate::iso8583::iso_spec::{IsoMsg, Spec};
@@ -44,7 +44,7 @@ impl IsoServer {
             let listener = std::net::TcpListener::bind(cp.sock_addr).unwrap();
 
             for stream in listener.incoming() {
-                let client = stream.unwrap();
+                let mut client = stream.unwrap();
                 debug!("Accepted new connection .. {:?}", &client.peer_addr());
                 new_client(cp, client);
             }
@@ -53,9 +53,11 @@ impl IsoServer {
 }
 
 
-fn new_client(iso_server: IsoServer, stream: TcpStream) {
+fn new_client(iso_server: IsoServer, stream_: TcpStream) {
     std::thread::spawn(move || {
         let mut buf: [u8; 512] = [0; 512];
+
+        let mut stream=stream_;
 
         let mut reading_mli = true;
         let mut in_buf: Vec<u8> = Vec::with_capacity(512);
@@ -85,6 +87,7 @@ fn new_client(iso_server: IsoServer, stream: TcpStream) {
                                     let data = &in_buf[0..mli as usize];
                                     debug!("received request len = {}  : data = {}", mli, hex::encode(data));
                                     iso_server.msg_processor.process(&iso_server, data.to_vec());
+                                    stream.write_all(vec![0x00, 0x02, 0x00, 0x99].as_slice());
                                     //TODO:: get the response and respond
                                     in_buf.drain(0..mli as usize).for_each(drop);
                                     mli = 0;

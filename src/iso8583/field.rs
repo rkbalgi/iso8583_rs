@@ -78,14 +78,7 @@ impl Field for FixedField {
     }
 
     fn to_string(&self, data: &Vec<u8>) -> String {
-        match self.encoding {
-            ASCII => {
-                String::from_utf8(data.clone()).unwrap()
-            }
-            _ => {
-                hex::encode(data.as_slice())
-            }
-        }
+        vec_to_string(&self.encoding, data)
     }
 }
 
@@ -161,13 +154,17 @@ impl Field for VarField
     }
 
     fn to_string(&self, data: &Vec<u8>) -> String {
-        match self.encoding {
-            ASCII => {
-                String::from_utf8(data.clone()).unwrap()
-            }
-            _ => {
-                hex::encode(data.as_slice())
-            }
+        vec_to_string(&self.encoding, data)
+    }
+}
+
+fn vec_to_string(encoding: &Encoding, data: &Vec<u8>) -> String {
+    match encoding {
+        ASCII => {
+            String::from_utf8(data.clone()).unwrap()
+        }
+        _ => {
+            hex::encode(data.as_slice())
         }
     }
 }
