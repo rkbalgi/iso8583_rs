@@ -29,6 +29,7 @@ pub trait Field: Sync {
 
     fn position(&self) -> u32;
     fn child_by_pos(&self, pos: u32) -> &dyn Field;
+    fn child_by_name(&self, name: &String) -> &dyn Field;
     fn to_string(&self, data: &Vec<u8>) -> String;
 }
 
@@ -45,13 +46,13 @@ impl Field for FixedField {
     }
 
     fn parse(self: &Self, in_buf: &mut Vec<u8>, iso_msg: &mut IsoMsg) -> Result<u32, ParseError> {
-        println!("before_parse:: {}", hex::encode(in_buf.as_slice()));
+        trace!("buf before_parse:: {}", hex::encode(in_buf.as_slice()));
         if self.len < in_buf.capacity() as u32 {
             let mut f_data = Vec::new();
             for _ in 0..self.len {
                 f_data.push(in_buf.remove(0));
             }
-            println!("parsed-data: {}", hex::encode(f_data.as_slice()));
+            trace!("parsed-data: {}", hex::encode(f_data.as_slice()));
             iso_msg.fd_map.insert(self.name.clone(), f_data);
 
             Ok(0)
@@ -69,6 +70,10 @@ impl Field for FixedField {
     }
 
     fn child_by_pos(&self, pos: u32) -> &dyn Field {
+        unimplemented!()
+    }
+
+    fn child_by_name(&self, name: &String) -> &dyn Field {
         unimplemented!()
     }
 
@@ -114,14 +119,14 @@ impl Field for VarField
     }
 
     fn parse(&self, in_buf: &mut Vec<u8>, iso_msg: &mut IsoMsg) -> Result<u32, ParseError> {
-        println!("before_parse:: {}", hex::encode(in_buf.as_slice()));
+        trace!("buf before_parse:: {}", hex::encode(in_buf.as_slice()));
         if self.len < in_buf.capacity() as u32 {
             let mut len_data = Vec::with_capacity(self.len as usize);
 
             for _ in 0..self.len {
                 (len_data).push(in_buf.remove(0));
             }
-            println!("parsed-data (len-ind) : {}", hex::encode(&len_data));
+            trace!("parsed-data (len-ind) : {}", hex::encode(&len_data));
 
 
             let data_len = self.data_len(&len_data);
@@ -148,6 +153,10 @@ impl Field for VarField
     }
 
     fn child_by_pos(&self, pos: u32) -> &dyn Field {
+        unimplemented!()
+    }
+
+    fn child_by_name(&self, name: &String) -> &dyn Field {
         unimplemented!()
     }
 

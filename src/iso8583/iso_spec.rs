@@ -41,6 +41,27 @@ impl Spec {
     pub fn name(&self) -> &String {
         &self.name
     }
+
+    pub fn field_by_name(&self, name: &String) -> Result<&dyn Field, IsoError> {
+        match self.fields().iter().find(|field| -> bool{
+
+            if field.name() == name {
+                true
+            } else {
+                false
+            }
+        }) {
+            None => {
+                //try bitmap
+                let bmp = self.field_by_name(&"bitmap".to_string()).unwrap();
+                //https://stackoverflow.com/questions/33687447/how-to-get-a-reference-to-a-concrete-type-from-a-trait-object
+                Ok(bmp.child_by_name(name))
+            }
+            Some(f) => {
+                Ok(f.as_ref())
+            }
+        }
+    }
 }
 
 // IsoMsg represents a parsed message for a given spec
@@ -57,7 +78,7 @@ impl IsoMsg {
 
     pub fn get_field_value(&self, pos: u32) -> Result<String, IsoError> {
         let f = self.spec.fields.iter().find(|f| -> bool {
-            if f.name() == "Bitmap" {
+            if f.name() == "bitmap" {
                 true
             } else {
                 false
@@ -81,7 +102,8 @@ impl Display for IsoMsg {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         let mut res = "".to_string();
         for (f, v) in &(self.fd_map) {
-            res = res + format!("\n{:20.40}: {}", f, hex::encode(v.as_slice())).as_str();
+            let field = self.spec.field_by_name(f).unwrap();
+            res = res + format!("\n{:20.40}: {} ", f, field.to_string(v)).as_str();
         }
         f.write_str(&res);
         Ok(())
@@ -102,7 +124,7 @@ impl Spec {
         let mut iso_msg = IsoMsg { spec: &self, fd_map: HashMap::new(), bmp: bitmap::new_bmp(0, 0, 0) };
 
         for f in self.fields() {
-            println!("parsing field : {}", f.name());
+            debug!("parsing field : {}", f.name());
             let res = match f.parse(&mut cp_data, &mut iso_msg) {
                 Err(e) => Result::Err(e),
                 Ok(r) => Result::Ok(r),
@@ -114,7 +136,7 @@ impl Spec {
         }
 
         if cp_data.len() > 0 {
-            println!("residual data : {}", hex::encode(cp_data.iter()))
+            warn!("residual data : {}", hex::encode(cp_data.iter()))
         }
 
         Ok(iso_msg)

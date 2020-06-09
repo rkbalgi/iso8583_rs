@@ -72,7 +72,7 @@ impl Field for BmpField {
             for _ in 0..8 {
                 f_data.push(in_buf.remove(0));
             }
-            println!("parsed-data: {} := {}", self.name, hex::encode(f_data.iter()));
+            trace!("parsed-data: {} := {}", self.name, hex::encode(f_data.iter()));
 
 
             let b1 = byteorder::BigEndian::read_u64(f_data.as_slice());
@@ -91,10 +91,13 @@ impl Field for BmpField {
                 if iso_msg.bmp.is_on(i) {
                     let is_present = self.by_position(i);
                     match is_present {
-                        Ok(f) => match f.parse(in_buf, iso_msg) {
-                            Ok(_) => Ok(0),
-                            Err(e) => Err(e),
-                        },
+                        Ok(f) => {
+                            debug!("parsing field - {}", f.name());
+                            match f.parse(in_buf, iso_msg) {
+                                Ok(_) => Ok(0),
+                                Err(e) => Err(e),
+                            }
+                        }
                         Err(e) => Err(e),
                     };
                 }
@@ -125,7 +128,17 @@ impl Field for BmpField {
         }).unwrap().as_ref()
     }
 
-    fn to_string(&self, _: &Vec<u8>) -> String {
-        unimplemented!()
+    fn child_by_name(&self, name: &String) -> &dyn Field {
+        self.children.iter().find(|f| -> bool {
+            if f.name() == name {
+                true
+            } else {
+                false
+            }
+        }).unwrap().as_ref()
+    }
+
+    fn to_string(&self, data: &Vec<u8>) -> String {
+        hex::encode(data)
     }
 }
