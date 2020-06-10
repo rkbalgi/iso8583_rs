@@ -166,7 +166,16 @@ impl IsoMsg {
     }
 
     pub fn assemble(&self) -> Result<Vec<u8>, IsoError> {
-        Ok(vec![1, 2, 3, 4])
+        let mut out_buf: Vec<u8> = Vec::new();
+        for f in &self.spec.fields {
+            match f.assemble(&mut out_buf, &self) {
+                Ok(_) => {}
+                Err(e) => {
+                    return Err(IsoError { msg: e.msg });
+                }
+            }
+        }
+        Ok(out_buf)
     }
 }
 

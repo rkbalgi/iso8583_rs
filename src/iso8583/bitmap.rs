@@ -1,5 +1,6 @@
 use crate::iso8583::field::{Field, ParseError, Encoding};
 use byteorder::ByteOrder;
+use crate::iso8583::iso_spec;
 
 #[derive(Debug)]
 pub struct Bitmap {
@@ -40,8 +41,24 @@ impl Bitmap {
         }
     }
 
-    pub fn hex_string(self: &Bitmap) -> String {
+    pub fn hex_string(&self) -> String {
         format!("{:016.0x}{:016.0x}{:016.0x}", self.p_bmp, self.s_bmp, self.t_bmp)
+    }
+
+    pub fn as_vec(&self) -> Vec<u8> {
+        let mut bmp_data = vec![0; 8];
+
+        byteorder::BigEndian::write_u64(&mut bmp_data[0..], self.p_bmp);
+        if ((self.p_bmp >> 63) & 0x01) == 0x01 {
+            bmp_data.resize(16, 0);
+            byteorder::BigEndian::write_u64(&mut bmp_data[8..], self.s_bmp);
+        }
+        if ((self.s_bmp >> 63) & 0x01) == 0x01 {
+            bmp_data.resize(24, 0);
+            byteorder::BigEndian::write_u64(&mut bmp_data[16..], self.t_bmp);
+        }
+
+        bmp_data
     }
 }
 
@@ -150,8 +167,27 @@ impl Field for BmpField {
         }
     }
 
-    fn assemble(&self, _: &mut Vec<u8>) -> Result<u32, ParseError> {
-        unimplemented!()
+    fn assemble(&self, out_buf: &mut Vec<u8>, iso_msg: &iso_spec::IsoMsg) -> Result<u32, ParseError> {
+        let bmp_data = iso_msg.bmp.as_vec();
+        out_buf.extend(bmp_data);
+
+        for pos in 2..193 {
+            if iso_msg.bmp.is_on(pos) {
+                match self.by_position(pos) {
+                    Ok(f) => {
+                        match iso_msg.fd_map.get(f.name()) {
+                            Some(fd) => {
+                                f.assemble(out_buf, iso_msg);
+                            }
+                            None => { return Err(ParseError { msg: format!("position {} is on, but no field data present!", pos) }); }
+                        };
+                    }
+                    Err(e) => return Err(e)
+                }
+            }
+        };
+
+        Ok(0)
     }
 
 

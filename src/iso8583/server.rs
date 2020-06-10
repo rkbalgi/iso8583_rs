@@ -16,7 +16,7 @@ pub struct IsoServerError {
 pub struct MsgProcessor {}
 
 impl MsgProcessor {
-    pub fn process(&self, iso_server: &IsoServer, msg: Vec<u8>) -> Result<Vec<u8>, IsoError> {
+    pub fn process(&self, iso_server: &IsoServer, msg: Vec<u8>) -> Result<(Vec<u8>, IsoMsg), IsoError> {
         match iso_server.spec.parse(msg) {
             Ok(iso_msg) => {
                 debug!("parsed incoming request - message type = \"{}\" successfully. \n : parsed message: \n --- \n {} \n ----\n",
@@ -44,11 +44,9 @@ impl MsgProcessor {
                             }
                         };
 
-                        debug!("echoing fields..");
                         if iso_resp_msg.echo_from(&iso_msg, &[2, 3, 4, 11, 14]).is_err() {
                             error!("failed to echo fields into response. error = {}", "!");
                         }
-                        debug!("done echoing ... ")
                     }
                     Err(e) => {
                         iso_resp_msg.set("message_type", "1110");
@@ -58,7 +56,7 @@ impl MsgProcessor {
                 }
 
                 match iso_resp_msg.assemble() {
-                    Ok(resp_data) => Ok(resp_data),
+                    Ok(resp_data) => Ok((resp_data, iso_resp_msg)),
                     Err(e) => {
                         error!("Failed to assemble response message - {}", e.msg);
                         Err(IsoError { msg: format!("error: msg assembly failed..{} ", e.msg) })
@@ -131,11 +129,14 @@ fn new_client(iso_server: IsoServer, stream_: TcpStream) {
                                 if mli > 0 && in_buf.len() >= mli as usize {
                                     let data = &in_buf[0..mli as usize];
                                     debug!("received request len = {}  : data = {}", mli, hex::encode(data));
+
                                     match iso_server.msg_processor.process(&iso_server, data.to_vec()) {
                                         Ok(resp) => {
+                                            debug!("iso_response \n raw:: {}, \n parsed:: \n {} \n ", hex::encode(&resp.0), resp.1);
+
                                             let mut resp_data = Vec::new();
-                                            resp_data.write_u16::<byteorder::BigEndian>(resp.len() as u16);
-                                            resp_data.write_all(resp.as_slice());
+                                            resp_data.write_u16::<byteorder::BigEndian>((&resp.0).len() as u16);
+                                            resp_data.write_all(resp.0.as_slice());
                                             stream.write_all(resp_data.as_slice());
                                         }
                                         Err(e) => {

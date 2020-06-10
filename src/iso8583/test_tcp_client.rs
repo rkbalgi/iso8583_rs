@@ -5,6 +5,7 @@ mod tests {
     use std::time::Duration;
     use byteorder::{WriteBytesExt, ReadBytesExt};
     use byteorder::ByteOrder;
+    use crate::iso8583::iso_spec;
 
 
     #[test]
@@ -29,7 +30,7 @@ mod tests {
         "004000".as_bytes().read_to_end(&mut raw_msg);
 
         //amount
-        "000000000200".as_bytes().read_to_end(&mut raw_msg);
+        "000000000099".as_bytes().read_to_end(&mut raw_msg);
 
         //stan
         "779581".as_bytes().read_to_end(&mut raw_msg);
@@ -50,6 +51,7 @@ mod tests {
         client.write_all(raw_msg.as_slice())?;
         client.flush();
 
+        // read the response
 
         let mut reader = BufReader::new(&mut client);
         let len = reader.read_u16::<byteorder::BigEndian>().unwrap();
@@ -59,7 +61,13 @@ mod tests {
 
         match reader.read_exact(&mut out_buf[..]) {
             Ok(()) => {
-                println!("received response:  {:?} with  {} bytes.", hex::encode(&out_buf), len)
+                println!("received response:  {:?} with  {} bytes.", hex::encode(&out_buf), len);
+                match iso_spec::spec("SampleSpec").parse(out_buf) {
+                    Ok(resp_iso_msg) => {
+                        println!("parsed iso-response:: \n {} \n", resp_iso_msg);
+                    }
+                    Err(e) => panic!(e.msg)
+                }
             }
             Err(e) => {
                 panic!(e)

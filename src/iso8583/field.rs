@@ -25,7 +25,7 @@ impl fmt::Display for ParseError {
 pub trait Field: Sync {
     fn name(&self) -> &String;
     fn parse(&self, in_buf: &mut Vec<u8>, iso_msg: &mut IsoMsg) -> Result<u32, ParseError>;
-    fn assemble(&self, out_buf: &mut Vec<u8>) -> Result<u32, ParseError>;
+    fn assemble(&self, out_buf: &mut Vec<u8>, iso_msg: &IsoMsg) -> Result<u32, ParseError>;
 
     fn position(&self) -> u32;
     fn child_by_pos(&self, pos: u32) -> &dyn Field;
@@ -62,8 +62,16 @@ impl Field for FixedField {
         }
     }
 
-    fn assemble(self: &Self, out_buf: &mut Vec<u8>) -> Result<u32, ParseError> {
-        unimplemented!()
+    fn assemble(self: &Self, out_buf: &mut Vec<u8>, iso_msg: &IsoMsg) -> Result<u32, ParseError> {
+        match iso_msg.fd_map.get(&self.name) {
+            Some(fd) => {
+                out_buf.extend(fd);
+                Ok(fd.as_slice().len() as u32)
+            }
+            None => {
+                Err(ParseError { msg: format!("field {} is not available!", self.name) })
+            }
+        }
     }
 
     fn position(&self) -> u32 {
@@ -108,6 +116,20 @@ impl VarField {
             _ => unimplemented!("only ascii supported for length encoding on var fields"),
         }
     }
+
+    fn build_len_ind(&self, len: usize) -> Vec<u8> {
+        match self.len_encoding {
+            Encoding::ASCII => {
+                match self.len {
+                    1 => format!("{:01}", len).into_bytes(),
+                    2 => format!("{:02}", len).into_bytes(),
+                    3 => format!("{:03}", len).into_bytes(),
+                    _ => unimplemented!("len-ind cannot exceed 3")
+                }
+            }
+            _ => unimplemented!("only ascii supported for length encoding on var fields")
+        }
+    }
 }
 
 impl Field for VarField
@@ -142,9 +164,21 @@ impl Field for VarField
     }
 
 
-    fn assemble(&self, _: &mut Vec<u8>) -> Result<u32, ParseError> {
-        unimplemented!()
+    fn assemble(&self, out_buf: &mut Vec<u8>, iso_msg: &IsoMsg) -> Result<u32, ParseError> {
+        match iso_msg.fd_map.get(&self.name) {
+            Some(fd) => {
+                let len_ind = self.build_len_ind(fd.len());
+                out_buf.extend(len_ind);
+                out_buf.extend(fd);
+                //fd.as_slice().iter().for_each(|d| out_buf.push(*d));
+                Ok(fd.as_slice().len() as u32)
+            }
+            None => {
+                Err(ParseError { msg: format!("field {} is not available!", self.name) })
+            }
+        }
     }
+
 
     fn position(&self) -> u32 {
         return self.position;
