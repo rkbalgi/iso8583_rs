@@ -31,6 +31,7 @@ pub trait Field: Sync {
     fn child_by_pos(&self, pos: u32) -> &dyn Field;
     fn child_by_name(&self, name: &String) -> &dyn Field;
     fn to_string(&self, data: &Vec<u8>) -> String;
+    fn to_raw(&self, val: &str) -> Vec<u8>;
 }
 
 pub struct FixedField {
@@ -79,6 +80,10 @@ impl Field for FixedField {
 
     fn to_string(&self, data: &Vec<u8>) -> String {
         vec_to_string(&self.encoding, data)
+    }
+
+    fn to_raw(&self, val: &str) -> Vec<u8> {
+        string_to_vec(&self.encoding, val)
     }
 }
 
@@ -156,6 +161,10 @@ impl Field for VarField
     fn to_string(&self, data: &Vec<u8>) -> String {
         vec_to_string(&self.encoding, data)
     }
+
+    fn to_raw(&self, val: &str) -> Vec<u8> {
+        string_to_vec(&self.encoding, val)
+    }
 }
 
 fn vec_to_string(encoding: &Encoding, data: &Vec<u8>) -> String {
@@ -169,6 +178,17 @@ fn vec_to_string(encoding: &Encoding, data: &Vec<u8>) -> String {
     }
 }
 
+
+fn string_to_vec(encoding: &Encoding, data: &str) -> Vec<u8> {
+    match encoding {
+        ASCII => {
+            data.to_string().into_bytes()
+        }
+        _ => {
+            hex::decode(data).unwrap()
+        }
+    }
+}
 
 
 

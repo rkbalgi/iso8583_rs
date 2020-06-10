@@ -9,7 +9,7 @@ pub struct Bitmap {
 }
 
 impl Bitmap {
-    pub fn is_on(self: &Bitmap, pos: u32) -> bool {
+    pub fn is_on(&self, pos: u32) -> bool {
         assert!(pos > 0 && pos <= 192);
         //println!("{:0x}{}", self.p_bmp >> 8, self.p_bmp >> ((64 as u32) - pos) as u64);
 
@@ -22,8 +22,43 @@ impl Bitmap {
         }
     }
 
+    pub fn set_on(&mut self, pos: u32) {
+        assert!(pos > 0 && pos <= 192);
+
+        if pos < 65 {
+            self.p_bmp = ((0x8000000000000000 as u64) >> (pos - 1) as u64) | self.p_bmp;
+        } else if pos > 64 && pos < 129 {
+            self.s_bmp = ((0x8000000000000000 as u64) >> (pos - 64 - 1) as u64) | self.s_bmp;
+            if !self.is_on(1) {
+                self.set_on(1);
+            }
+        } else {
+            self.t_bmp = ((0x8000000000000000 as u64) >> (pos - 128 - 1) as u64) | self.t_bmp;
+            if !self.is_on(65) {
+                self.set_on(65);
+            }
+        }
+    }
+
     pub fn hex_string(self: &Bitmap) -> String {
         format!("{:016.0x}{:016.0x}{:016.0x}", self.p_bmp, self.s_bmp, self.t_bmp)
+    }
+}
+
+#[test]
+fn test_bmp() {
+    let mut bmp = new_bmp(0, 0, 0);
+    bmp.set_on(4);
+    bmp.set_on(11);
+    bmp.set_on(64);
+    bmp.set_on(99);
+    bmp.set_on(133);
+    bmp.set_on(6);
+
+    for i in 1..193 {
+        if bmp.is_on(i) {
+            println!("{} is on ", i)
+        }
     }
 }
 
@@ -146,5 +181,9 @@ impl Field for BmpField {
 
     fn to_string(&self, data: &Vec<u8>) -> String {
         hex::encode(data)
+    }
+
+    fn to_raw(&self, val: &str) -> Vec<u8> {
+        unimplemented!()
     }
 }

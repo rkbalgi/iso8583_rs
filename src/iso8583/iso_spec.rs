@@ -20,8 +20,11 @@ static ref ALL_SPECS: std::collections::HashMap<String,Spec> ={
                  children: vec![
                                 Box::new(VarField { name: "pan".to_string(), len: 2, encoding: Encoding::ASCII, len_encoding: Encoding::ASCII, position:2 }),
                                 Box::new(FixedField { name: "proc_code".to_string(), len: 6, encoding: Encoding::ASCII, position:3 }),
+                                Box::new(FixedField { name: "amount".to_string(), len: 12, encoding: Encoding::ASCII, position:4 }),
                                 Box::new(FixedField { name: "stan".to_string(), len: 6, encoding: Encoding::ASCII, position:11 }),
                                 Box::new(FixedField { name: "expiration_date".to_string(), len: 4, encoding: Encoding::ASCII, position: 14 }),
+                                Box::new(FixedField { name: "approval_code".to_string(), len: 6, encoding: Encoding::ASCII, position:38 }),
+                                Box::new(FixedField { name: "action_code".to_string(), len: 3, encoding: Encoding::ASCII, position:39 }),
                                ]}),
 
         ],
@@ -44,7 +47,6 @@ impl Spec {
 
     pub fn field_by_name(&self, name: &String) -> Result<&dyn Field, IsoError> {
         match self.fields().iter().find(|field| -> bool{
-
             if field.name() == name {
                 true
             } else {
@@ -67,7 +69,9 @@ impl Spec {
 // IsoMsg represents a parsed message for a given spec
 pub struct IsoMsg {
     pub spec: &'static Spec,
+    // field data map - name to raw value
     pub fd_map: std::collections::HashMap<String, Vec<u8>>,
+    // the bitmap on the iso message
     pub bmp: bitmap::Bitmap,
 }
 
@@ -76,7 +80,8 @@ impl IsoMsg {
         self.spec
     }
 
-    pub fn get_field_value(&self, pos: u32) -> Result<String, IsoError> {
+    // Returns the value of a field by position in the bitmap
+    pub fn bmp_child_value(&self, pos: u32) -> Result<String, IsoError> {
         let f = self.spec.fields.iter().find(|f| -> bool {
             if f.name() == "bitmap" {
                 true
@@ -94,6 +99,74 @@ impl IsoMsg {
                 Ok(cf.to_string(v))
             }
         }
+    }
+
+    // Get the value of a top level field like message_type
+    pub fn get_field_value(&self, name: &String) -> Result<String, IsoError> {
+        match self.spec.fields.iter().find(|f| -> bool {
+            if f.name() == name {
+                true
+            } else {
+                false
+            }
+        }) {
+            Some(f) => {
+                Ok(f.to_string(self.fd_map.get(name).unwrap()))
+            }
+            None => {
+                Err(IsoError { msg: format!("No such field : {}", name) })
+            }
+        }
+    }
+
+    // sets a top-level field like message_type etc
+    pub fn set(&mut self, name: &str, val: &str) -> Result<(), IsoError> {
+        match self.spec.field_by_name(&name.to_string()) {
+            Ok(f) => {
+                self.fd_map.insert(f.name().clone(), f.to_raw(val));
+                Ok(())
+            }
+            Err(e) => Err(e)
+        }
+    }
+
+    // Sets a field on the bitmap
+    pub fn set_on(&mut self, pos: u32, val: &str) -> Result<(), IsoError> {
+        match self.spec.field_by_name(&"bitmap".to_string()) {
+            Ok(f) => {
+                let cf = f.child_by_pos(pos);
+                self.fd_map.insert(cf.name().clone(), cf.to_raw(val));
+                self.bmp.set_on(pos);
+                Ok(())
+            }
+            Err(e) => Err(e)
+        }
+    }
+
+    pub fn echo_from(&mut self, req_msg: &IsoMsg, positions: &[u32]) -> Result<(), IsoError> {
+        match self.spec.field_by_name(&"bitmap".to_string()) {
+            Ok(f) => {
+                for pos in positions {
+                    let cf = f.child_by_pos(*pos);
+                    match req_msg.bmp_child_value(*pos) {
+                        Ok(res) => {
+                            debug!("echoing .. {}: {}", pos, res);
+                            self.fd_map.insert(cf.name().clone(), cf.to_raw(res.as_str()));
+                            self.bmp.set_on(*pos);
+                        }
+                        Err(e) => {
+                            return Err(e);
+                        }
+                    }
+                }
+                Ok(())
+            }
+            Err(e) => Err(e)
+        }
+    }
+
+    pub fn assemble(&self) -> Result<Vec<u8>, IsoError> {
+        Ok(vec![1, 2, 3, 4])
     }
 }
 

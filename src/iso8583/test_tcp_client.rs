@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use std::net::TcpStream;
-    use std::io::{Write, Read};
+    use std::io::{Write, Read, BufReader};
     use std::time::Duration;
     use byteorder::{WriteBytesExt, ReadBytesExt};
     use byteorder::ByteOrder;
@@ -19,7 +19,7 @@ mod tests {
         "1100".as_bytes().read_to_end(&mut raw_msg);
 
         //bitmap
-        raw_msg.write_all(hex::decode("6024000000000000").expect("failed to decode bmp").as_slice());
+        raw_msg.write_all(hex::decode("7024000000000000").expect("failed to decode bmp").as_slice());
 
         //pan - with length indicator and data
         "12".as_bytes().read_to_end(&mut raw_msg);
@@ -27,6 +27,9 @@ mod tests {
 
         //proc code
         "004000".as_bytes().read_to_end(&mut raw_msg);
+
+        //amount
+        "000000000200".as_bytes().read_to_end(&mut raw_msg);
 
         //stan
         "779581".as_bytes().read_to_end(&mut raw_msg);
@@ -47,12 +50,17 @@ mod tests {
         client.write_all(raw_msg.as_slice())?;
         client.flush();
 
-        let len = client.read_u16::<byteorder::BigEndian>().unwrap();
+
+        let mut reader = BufReader::new(&mut client);
+        let len = reader.read_u16::<byteorder::BigEndian>().unwrap();
         println!("received response with {} bytes", len);
-        let mut out_buf = Vec::with_capacity(len as usize);
-        match client.read_exact(out_buf.as_mut_slice()) {
+
+
+        let mut out_buf = [0 as u8, len as u8];
+        println!("{}", out_buf.len());
+        match reader.read_exact(&mut out_buf[..]) {
             Ok(()) => {
-                println!("received {}", hex::encode(out_buf.as_slice()))
+                println!("received {:?} {}", &out_buf, out_buf.len())
             }
             Err(e) => {
                 panic!(e)
