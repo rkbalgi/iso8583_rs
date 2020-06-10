@@ -17,7 +17,6 @@ mod iso8583;
 fn main() {
     let _ = simplelog::SimpleLogger::init(simplelog::LevelFilter::Debug, simplelog::Config::default());
 
-
     let iso_spec = iso8583::iso_spec::spec("SampleSpec");
 
     info!("starting iso server for spec {} at port {}", iso_spec.name(), 6666);
@@ -29,8 +28,5 @@ fn main() {
             panic!(e)
         }
     };
-    server.start();
-
-
-    std::thread::sleep(Duration::from_secs(1000));
+    server.start().join();
 }
