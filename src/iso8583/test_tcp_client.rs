@@ -53,14 +53,13 @@ mod tests {
 
         let mut reader = BufReader::new(&mut client);
         let len = reader.read_u16::<byteorder::BigEndian>().unwrap();
-        println!("received response with {} bytes", len);
 
 
-        let mut out_buf = [0 as u8, len as u8];
-        println!("{}", out_buf.len());
+        let mut out_buf = vec![0; len as usize];
+
         match reader.read_exact(&mut out_buf[..]) {
             Ok(()) => {
-                println!("received {:?} {}", &out_buf, out_buf.len())
+                println!("received response:  {:?} with  {} bytes.", hex::encode(&out_buf), len)
             }
             Err(e) => {
                 panic!(e)

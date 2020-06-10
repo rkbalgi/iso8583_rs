@@ -6,6 +6,7 @@ use crate::iso8583::iso_spec::{IsoMsg, Spec};
 use log;
 use std::collections::HashMap;
 use crate::iso8583::{bitmap, IsoError};
+use std::thread::JoinHandle;
 
 pub struct IsoServerError {
     msg: String
@@ -18,7 +19,7 @@ impl MsgProcessor {
     pub fn process(&self, iso_server: &IsoServer, msg: Vec<u8>) -> Result<Vec<u8>, IsoError> {
         match iso_server.spec.parse(msg) {
             Ok(iso_msg) => {
-                debug!("parsed incoming request - message type = \"{}\" successfully. \n : parsed message: --- \n {} \n ----\n",
+                debug!("parsed incoming request - message type = \"{}\" successfully. \n : parsed message: \n --- \n {} \n ----\n",
                        iso_msg.get_field_value(&"message_type".to_string()).unwrap(), iso_msg);
 
                 let mut iso_resp_msg = IsoMsg { spec: &iso_msg.spec, fd_map: HashMap::new(), bmp: bitmap::new_bmp(0, 0, 0) };
@@ -45,7 +46,7 @@ impl MsgProcessor {
 
                         debug!("echoing fields..");
                         if iso_resp_msg.echo_from(&iso_msg, &[2, 3, 4, 11, 14]).is_err() {
-                            error!("failed to echo fields into response. error = {}","!");
+                            error!("failed to echo fields into response. error = {}", "!");
                         }
                         debug!("done echoing ... ")
                     }
@@ -80,7 +81,7 @@ pub struct IsoServer {
 
 
 impl IsoServer {
-    pub fn start(&self) {
+    pub fn start(&self) -> JoinHandle<()> {
         //let iso_serv=*self;
         let cp = *self;
 
@@ -92,7 +93,7 @@ impl IsoServer {
                 debug!("Accepted new connection .. {:?}", &client.peer_addr());
                 new_client(cp, client);
             }
-        });
+        })
     }
 }
 
@@ -134,7 +135,8 @@ fn new_client(iso_server: IsoServer, stream_: TcpStream) {
                                         Ok(resp) => {
                                             let mut resp_data = Vec::new();
                                             resp_data.write_u16::<byteorder::BigEndian>(resp.len() as u16);
-                                            stream.write_all(resp.as_slice());
+                                            resp_data.write_all(resp.as_slice());
+                                            stream.write_all(resp_data.as_slice());
                                         }
                                         Err(e) => {
                                             error!("failed to handle incoming req - {}", e.msg)
