@@ -3,7 +3,11 @@ ISO8583 library written in Rust
 
 ## This project is WIP
 
-* A sample spec is defined in [iso_spec.rs](https://github.com/rkbalgi/iso8583_rs/blob/8ea245db2d57510409fabf1a05dab2dcb596c30f/src/iso8583/iso_spec.rs#L15)
+###  Latest
+* Included header fields support - messages are selected (using selector) based on header_fields defined on the Spec
+
+
+* A sample spec is defined in [iso_spec.rs](src/iso8583/iso_spec.rs)
 * Only ASCII encoding is supported at this time
 
 ## Run ISO Server
