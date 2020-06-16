@@ -15,7 +15,7 @@ impl MsgProcessor {
                 debug!("parsed incoming request - message type = \"{}\" successfully. \n : parsed message: \n --- \n {} \n ----\n",
                        iso_msg.get_field_value(&"message_type".to_string()).unwrap(), iso_msg);
 
-                let mut iso_resp_msg = IsoMsg { spec: &iso_msg.spec, msg: &iso_msg.spec.get_message("authorization - 1100").unwrap(),
+                let mut iso_resp_msg = IsoMsg { spec: &iso_msg.spec, msg: &iso_msg.spec.get_message_from_header("1110").unwrap(),
                     fd_map: HashMap::new(), bmp: bitmap::new_bmp(0, 0, 0) };
 
                 // process the incoming request based on amount

@@ -30,7 +30,7 @@ mod tests {
         "004000".as_bytes().read_to_end(&mut raw_msg);
 
         //amount
-        "000000000099".as_bytes().read_to_end(&mut raw_msg);
+        "000000000199".as_bytes().read_to_end(&mut raw_msg);
 
         //stan
         "779581".as_bytes().read_to_end(&mut raw_msg);

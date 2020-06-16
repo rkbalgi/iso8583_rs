@@ -36,8 +36,8 @@ static ref ALL_SPECS: std::collections::HashMap<String,Spec> ={
                                 Box::new(FixedField { name: "action_code".to_string(), len: 3, encoding: Encoding::ASCII, position:39 }),
                                ]}),
 
-        ]} /*end auth*/,
-          ] /*end message*/,
+        ]} /*end auth message*/,
+          ] /*end messages*/,
 
 
     });
