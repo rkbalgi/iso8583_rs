@@ -5,6 +5,7 @@ use crate::iso8583::{bitmap, IsoError};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use crate::iso8583::server::IsoServerError;
+use crate::iso8583::bitmap::Bitmap;
 
 
 lazy_static! {
@@ -12,9 +13,17 @@ static ref ALL_SPECS: std::collections::HashMap<String,Spec> ={
 
     let mut specs=HashMap::new();
 
+    //TODO:: externalize this into a spec (see sample_spec.yaml)
     specs.insert("SampleSpec".to_string(),Spec {
-        name: "SampleSpec".to_string(),
-        fields: vec![
+        name: "SampleSpec",
+        header_fields:vec![
+            Box::new(FixedField { name: "message_type".to_string(), len: 4, encoding: Encoding::ASCII ,position: 0}),
+            ],
+        messages: vec![
+          Message{
+                 selector: vec!["1100","1110"],
+                 name: "Authorization - 1100",
+                 req_fields:  vec![
             Box::new(FixedField { name: "message_type".to_string(), len: 4, encoding: Encoding::ASCII ,position: 0}),
             Box::new(bitmap::BmpField { name: "bitmap".to_string(), encoding: Encoding::ASCII ,
                  children: vec![
@@ -27,7 +36,10 @@ static ref ALL_SPECS: std::collections::HashMap<String,Spec> ={
                                 Box::new(FixedField { name: "action_code".to_string(), len: 3, encoding: Encoding::ASCII, position:39 }),
                                ]}),
 
-        ],
+        ]} /*end auth*/,
+          ] /*end message*/,
+
+
     });
 
     specs
@@ -36,17 +48,25 @@ static ref ALL_SPECS: std::collections::HashMap<String,Spec> ={
 
 // Spec is the definition of the spec - layout of fields etc..
 pub struct Spec {
-    name: String,
-    fields: Vec<Box<dyn Field>>,
+    name: &'static str,
+    messages: Vec<Message>,
+    header_fields: Vec<Box<dyn Field>>,
 }
 
-impl Spec {
-    pub fn name(&self) -> &String {
-        &self.name
+pub struct Message {
+    name: &'static str,
+    selector: Vec<&'static str>,
+    req_fields: Vec<Box<dyn Field>>,
+}
+
+
+impl Message {
+    pub fn name(&self) -> &str {
+        return self.name;
     }
 
     pub fn field_by_name(&self, name: &String) -> Result<&dyn Field, IsoError> {
-        match self.fields().iter().find(|field| -> bool{
+        match self.req_fields.iter().find(|field| -> bool{
             if field.name() == name {
                 true
             } else {
@@ -56,7 +76,6 @@ impl Spec {
             None => {
                 //try bitmap
                 let bmp = self.field_by_name(&"bitmap".to_string()).unwrap();
-                //https://stackoverflow.com/questions/33687447/how-to-get-a-reference-to-a-concrete-type-from-a-trait-object
                 Ok(bmp.child_by_name(name))
             }
             Some(f) => {
@@ -66,9 +85,57 @@ impl Spec {
     }
 }
 
+impl Spec {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn get_message(&self, name: &str) -> Result<&Message, IsoError> {
+        for msg in &self.messages {
+            if msg.name() == name {
+                return Ok(msg);
+            }
+        }
+        return Err(IsoError { msg: format!("{} message not found", name) });
+    }
+
+    pub fn get_message_from_header(&self, header_val: &str) -> Result<&Message, IsoError> {
+        for msg in &self.messages {
+            if msg.selector.contains(&header_val) {
+                return Ok(msg);
+            }
+        }
+        return Err(IsoError { msg: format!("message not found for header - {}", header_val) });
+    }
+
+    pub fn get_msg_segment(&'static self, data: &mut Vec<u8>) -> Result<&Message, IsoError> {
+        let mut selector = String::new();
+        let mut f2d_map = HashMap::new();
+        for f in &self.header_fields {
+            match f.parse(data, &mut f2d_map) {
+                Ok(_) => {
+                    selector.extend(f.to_string(f2d_map.get(f.name()).unwrap()).chars());
+                }
+                Err(e) => {
+                    return Err(IsoError { msg: e.msg });
+                }
+            }
+        }
+
+        debug!("computed header value for incoming message = {}", selector);
+        match self.get_message_from_header(selector.as_str()) {
+            Ok(msg) => {
+                Ok(msg)
+            }
+            Err(e) => Err(e)
+        }
+    }
+}
+
 // IsoMsg represents a parsed message for a given spec
 pub struct IsoMsg {
     pub spec: &'static Spec,
+    pub msg: &'static Message,
     // field data map - name to raw value
     pub fd_map: std::collections::HashMap<String, Vec<u8>>,
     // the bitmap on the iso message
@@ -82,7 +149,7 @@ impl IsoMsg {
 
     // Returns the value of a field by position in the bitmap
     pub fn bmp_child_value(&self, pos: u32) -> Result<String, IsoError> {
-        let f = self.spec.fields.iter().find(|f| -> bool {
+        let f = self.msg.req_fields.iter().find(|f| -> bool {
             if f.name() == "bitmap" {
                 true
             } else {
@@ -103,7 +170,7 @@ impl IsoMsg {
 
     // Get the value of a top level field like message_type
     pub fn get_field_value(&self, name: &String) -> Result<String, IsoError> {
-        match self.spec.fields.iter().find(|f| -> bool {
+        match self.msg.req_fields.iter().find(|f| -> bool {
             if f.name() == name {
                 true
             } else {
@@ -121,7 +188,7 @@ impl IsoMsg {
 
     // sets a top-level field like message_type etc
     pub fn set(&mut self, name: &str, val: &str) -> Result<(), IsoError> {
-        match self.spec.field_by_name(&name.to_string()) {
+        match self.msg.field_by_name(&name.to_string()) {
             Ok(f) => {
                 self.fd_map.insert(f.name().clone(), f.to_raw(val));
                 Ok(())
@@ -132,7 +199,7 @@ impl IsoMsg {
 
     // Sets a field on the bitmap
     pub fn set_on(&mut self, pos: u32, val: &str) -> Result<(), IsoError> {
-        match self.spec.field_by_name(&"bitmap".to_string()) {
+        match self.msg.field_by_name(&"bitmap".to_string()) {
             Ok(f) => {
                 let cf = f.child_by_pos(pos);
                 self.fd_map.insert(cf.name().clone(), cf.to_raw(val));
@@ -144,7 +211,7 @@ impl IsoMsg {
     }
 
     pub fn echo_from(&mut self, req_msg: &IsoMsg, positions: &[u32]) -> Result<(), IsoError> {
-        match self.spec.field_by_name(&"bitmap".to_string()) {
+        match self.msg.field_by_name(&"bitmap".to_string()) {
             Ok(f) => {
                 for pos in positions {
                     let cf = f.child_by_pos(*pos);
@@ -167,7 +234,7 @@ impl IsoMsg {
 
     pub fn assemble(&self) -> Result<Vec<u8>, IsoError> {
         let mut out_buf: Vec<u8> = Vec::new();
-        for f in &self.spec.fields {
+        for f in &self.msg.req_fields {
             match f.assemble(&mut out_buf, &self) {
                 Ok(_) => {}
                 Err(e) => {
@@ -184,7 +251,7 @@ impl Display for IsoMsg {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         let mut res = "".to_string();
         for (f, v) in &(self.fd_map) {
-            let field = self.spec.field_by_name(f).unwrap();
+            let field = self.msg.field_by_name(f).unwrap();
             res = res + format!("\n{:20.40}: {} ", f, field.to_string(v)).as_str();
         }
         f.write_str(&res).unwrap();
@@ -198,18 +265,28 @@ pub fn spec(name: &str) -> &'static Spec {
 }
 
 impl Spec {
-    pub fn fields(&self) -> &Vec<Box<dyn Field>> {
-        &self.fields
-    }
     pub fn parse(&'static self, data: Vec<u8>) -> Result<IsoMsg, ParseError> {
         let mut cp_data = data.clone();
-        let mut iso_msg = IsoMsg { spec: &self, fd_map: HashMap::new(), bmp: bitmap::new_bmp(0, 0, 0) };
 
-        for f in self.fields() {
+        let msg = self.get_msg_segment(&mut data.clone());
+        if msg.is_err() {
+            return Err(ParseError { msg: msg.err().unwrap().msg });
+        }
+
+        let mut iso_msg = IsoMsg {
+            spec: &self,
+            msg: &msg.unwrap(),
+            fd_map: HashMap::new(),
+            bmp: bitmap::new_bmp(0, 0, 0),
+        };
+
+        for f in &iso_msg.msg.req_fields {
             debug!("parsing field : {}", f.name());
-            let res = match f.parse(&mut cp_data, &mut iso_msg) {
+            let res = match f.parse(&mut cp_data, &mut iso_msg.fd_map) {
                 Err(e) => Result::Err(e),
-                Ok(r) => Result::Ok(r),
+                Ok(r) => {
+                    Ok(())
+                }
             };
 
             if res.is_err() {

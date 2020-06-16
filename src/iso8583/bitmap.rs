@@ -1,6 +1,7 @@
 use crate::iso8583::field::{Field, ParseError, Encoding};
 use byteorder::ByteOrder;
 use crate::iso8583::iso_spec;
+use std::collections::HashMap;
 
 #[derive(Debug)]
 pub struct Bitmap {
@@ -118,7 +119,7 @@ impl Field for BmpField {
         &self.name
     }
 
-    fn parse(&self, in_buf: &mut Vec<u8>, iso_msg: &mut crate::iso8583::iso_spec::IsoMsg) -> Result<u32, ParseError> {
+    fn parse(&self, in_buf: &mut Vec<u8>, f2d_map: &mut HashMap<String, Vec<u8>>) -> Result<(), ParseError> {
         if in_buf.capacity() as u32 >= 8 {
             let mut f_data = Vec::new();
             for _ in 0..8 {
@@ -135,18 +136,20 @@ impl Field for BmpField {
             }
 
             let bmp = new_bmp(b1, 0, 0);
-            iso_msg.fd_map.insert(self.name.clone(), f_data);
-            iso_msg.bmp = bmp;
+            //iso_msg.bmp = bmp;
+            f2d_map.insert(self.name().to_string(), bmp.as_vec());
 
 
             for i in 2..193 {
-                if iso_msg.bmp.is_on(i) {
+                if bmp.is_on(i) {
                     let is_present = self.by_position(i);
                     match match is_present {
                         Ok(f) => {
                             debug!("parsing field - {}", f.name());
-                            match f.parse(in_buf, iso_msg) {
-                                Ok(_) => Ok(0),
+                            match f.parse(in_buf, f2d_map) {
+                                Ok(r) => {
+                                    Ok(())
+                                }
                                 Err(e) => Err(e),
                             }
                         }
@@ -161,7 +164,7 @@ impl Field for BmpField {
                 }
             }
 
-            Ok(0)
+            Ok(())
         } else {
             Err(ParseError { msg: format!("require {} but have {}", 8, in_buf.capacity()) })
         }
