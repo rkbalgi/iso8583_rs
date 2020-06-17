@@ -1,6 +1,10 @@
 # iso8583_rs
 ISO8583 library written in Rust 
 
+* Define and start a ISO8583 server
+* Define a message-processor that can "act" on an incoming message and generate a response
+* Use a TCP client to invoke the ISO server
+
 (This project is mostly WIP) 
 
 
