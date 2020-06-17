@@ -12,8 +12,8 @@ impl MsgProcessor {
     pub fn process(&self, iso_server: &IsoServer, msg: Vec<u8>) -> Result<(Vec<u8>, IsoMsg), IsoError> {
         match iso_server.spec.parse(msg) {
             Ok(iso_msg) => {
-                debug!("parsed incoming request - message type = \"{}\" successfully. \n : parsed message: \n --- \n {} \n ----\n",
-                       iso_msg.get_field_value(&"message_type".to_string()).unwrap(), iso_msg);
+                debug!("parsed incoming request - message = \"{}\" successfully. \n : parsed message: \n --- \n {} \n ----\n",
+                       iso_msg.msg.name(), iso_msg);
 
                 let mut iso_resp_msg = IsoMsg { spec: &iso_msg.spec, msg: &iso_msg.spec.get_message_from_header("1110").unwrap(),
                     fd_map: HashMap::new(), bmp: bitmap::new_bmp(0, 0, 0) };

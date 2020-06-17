@@ -38,6 +38,8 @@ mod tests {
         //expiration date
         "2204".as_bytes().read_to_end(&mut raw_msg);
 
+
+
         let mut mli: [u8; 2] = [0; 2];
         byteorder::BigEndian::write_u16(&mut mli[..], raw_msg.len() as u16 - 2);
 
@@ -64,7 +66,7 @@ mod tests {
                 println!("received response:  {:?} with  {} bytes.", hex::encode(&out_buf), len);
                 match iso_spec::spec("SampleSpec").parse(out_buf) {
                     Ok(resp_iso_msg) => {
-                        println!("parsed iso-response:: \n {} \n", resp_iso_msg);
+                        println!("parsed iso-response \"{}\" \n {} \n", resp_iso_msg.msg.name(),resp_iso_msg);
                     }
                     Err(e) => panic!(e.msg)
                 }

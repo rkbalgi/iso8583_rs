@@ -20,9 +20,24 @@ static ref ALL_SPECS: std::collections::HashMap<String,Spec> ={
             Box::new(FixedField { name: "message_type".to_string(), len: 4, encoding: Encoding::ASCII ,position: 0}),
             ],
         messages: vec![
-          Message{
-                 selector: vec!["1100","1110"],
-                 name: "Authorization - 1100",
+          MessageSegment{
+                 selector: vec!["1100"],
+                 name: "Authorization Request - 1100",
+                 req_fields:  vec![
+            Box::new(FixedField { name: "message_type".to_string(), len: 4, encoding: Encoding::ASCII ,position: 0}),
+            Box::new(bitmap::BmpField { name: "bitmap".to_string(), encoding: Encoding::ASCII ,
+                 children: vec![
+                                Box::new(VarField { name: "pan".to_string(), len: 2, encoding: Encoding::ASCII, len_encoding: Encoding::ASCII, position:2 }),
+                                Box::new(FixedField { name: "proc_code".to_string(), len: 6, encoding: Encoding::ASCII, position:3 }),
+                                Box::new(FixedField { name: "amount".to_string(), len: 12, encoding: Encoding::ASCII, position:4 }),
+                                Box::new(FixedField { name: "stan".to_string(), len: 6, encoding: Encoding::ASCII, position:11 }),
+                                Box::new(FixedField { name: "expiration_date".to_string(), len: 4, encoding: Encoding::ASCII, position: 14 }),
+                               ]}),
+
+        ]} /*end auth 1100 message*/,
+        MessageSegment{
+                 selector: vec!["1110"],
+                 name: "Authorization Response - 1110",
                  req_fields:  vec![
             Box::new(FixedField { name: "message_type".to_string(), len: 4, encoding: Encoding::ASCII ,position: 0}),
             Box::new(bitmap::BmpField { name: "bitmap".to_string(), encoding: Encoding::ASCII ,
@@ -36,7 +51,7 @@ static ref ALL_SPECS: std::collections::HashMap<String,Spec> ={
                                 Box::new(FixedField { name: "action_code".to_string(), len: 3, encoding: Encoding::ASCII, position:39 }),
                                ]}),
 
-        ]} /*end auth message*/,
+        ]} /*end auth 1110 message*/,
           ] /*end messages*/,
 
 
@@ -49,18 +64,18 @@ static ref ALL_SPECS: std::collections::HashMap<String,Spec> ={
 // Spec is the definition of the spec - layout of fields etc..
 pub struct Spec {
     name: &'static str,
-    messages: Vec<Message>,
+    messages: Vec<MessageSegment>,
     header_fields: Vec<Box<dyn Field>>,
 }
 
-pub struct Message {
+pub struct MessageSegment {
     name: &'static str,
     selector: Vec<&'static str>,
     req_fields: Vec<Box<dyn Field>>,
 }
 
 
-impl Message {
+impl MessageSegment {
     pub fn name(&self) -> &str {
         return self.name;
     }
@@ -90,7 +105,7 @@ impl Spec {
         &self.name
     }
 
-    pub fn get_message(&self, name: &str) -> Result<&Message, IsoError> {
+    pub fn get_message(&self, name: &str) -> Result<&MessageSegment, IsoError> {
         for msg in &self.messages {
             if msg.name() == name {
                 return Ok(msg);
@@ -99,7 +114,7 @@ impl Spec {
         return Err(IsoError { msg: format!("{} message not found", name) });
     }
 
-    pub fn get_message_from_header(&self, header_val: &str) -> Result<&Message, IsoError> {
+    pub fn get_message_from_header(&self, header_val: &str) -> Result<&MessageSegment, IsoError> {
         for msg in &self.messages {
             if msg.selector.contains(&header_val) {
                 return Ok(msg);
@@ -108,7 +123,7 @@ impl Spec {
         return Err(IsoError { msg: format!("message not found for header - {}", header_val) });
     }
 
-    pub fn get_msg_segment(&'static self, data: &mut Vec<u8>) -> Result<&Message, IsoError> {
+    pub fn get_msg_segment(&'static self, data: &mut Vec<u8>) -> Result<&MessageSegment, IsoError> {
         let mut selector = String::new();
         let mut f2d_map = HashMap::new();
         for f in &self.header_fields {
@@ -135,7 +150,7 @@ impl Spec {
 // IsoMsg represents a parsed message for a given spec
 pub struct IsoMsg {
     pub spec: &'static Spec,
-    pub msg: &'static Message,
+    pub msg: &'static MessageSegment,
     // field data map - name to raw value
     pub fd_map: std::collections::HashMap<String, Vec<u8>>,
     // the bitmap on the iso message
