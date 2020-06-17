@@ -1,15 +1,35 @@
 #[cfg(test)]
 mod tests {
     use std::net::TcpStream;
-    use std::io::{Write, Read, BufReader};
+    use std::io::{Write, Read, BufReader, Error};
     use std::time::Duration;
     use byteorder::{WriteBytesExt, ReadBytesExt};
     use byteorder::ByteOrder;
     use crate::iso8583::iso_spec;
+    use crate::iso8583::server::IsoServer;
+
+    #[test]
+    fn test_server() -> Result<(),()> {
+        let _ = simplelog::SimpleLogger::init(simplelog::LevelFilter::Debug, simplelog::Config::default());
+
+        let iso_spec = crate::iso8583::iso_spec::spec("SampleSpec");
+
+        info!("starting iso server for spec {} at port {}", iso_spec.name(), 6666);
+        let server: IsoServer = match crate::iso8583::server::new("localhost:6666".to_string(), iso_spec) {
+            Ok(server) => {
+                server
+            }
+            Err(e) => {
+                panic!(e)
+            }
+        };
+        server.start().join();
+        Ok(())
+    }
 
 
     #[test]
-    fn test_send_recv_iso() -> std::io::Result<()> {
+    fn test_send_recv_iso() -> Result<(),Error> {
         let mut raw_msg: Vec<u8> = Vec::new();
 
         //make space for mli (swapped later)
@@ -39,7 +59,6 @@ mod tests {
         "2204".as_bytes().read_to_end(&mut raw_msg);
 
 
-
         let mut mli: [u8; 2] = [0; 2];
         byteorder::BigEndian::write_u16(&mut mli[..], raw_msg.len() as u16 - 2);
 
@@ -66,7 +85,7 @@ mod tests {
                 println!("received response:  {:?} with  {} bytes.", hex::encode(&out_buf), len);
                 match iso_spec::spec("SampleSpec").parse(out_buf) {
                     Ok(resp_iso_msg) => {
-                        println!("parsed iso-response \"{}\" \n {} \n", resp_iso_msg.msg.name(),resp_iso_msg);
+                        println!("parsed iso-response \"{}\" \n {} \n", resp_iso_msg.msg.name(), resp_iso_msg);
                     }
                     Err(e) => panic!(e.msg)
                 }

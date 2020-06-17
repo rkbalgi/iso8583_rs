@@ -13,7 +13,7 @@ static ref ALL_SPECS: std::collections::HashMap<String,Spec> ={
 
     let mut specs=HashMap::new();
 
-    //TODO:: externalize this into a spec (see sample_spec.yaml)
+    //TODO:: externalize this into a spec (see sample_spec.yaml - WIP)
     specs.insert("SampleSpec".to_string(),Spec {
         name: "SampleSpec",
         header_fields:vec![

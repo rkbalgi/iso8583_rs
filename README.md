@@ -17,7 +17,7 @@ ISO8583 library written in Rust
 * Only ASCII encoding is supported at this time
 
 ## Run ISO Server
-* Run main.rs to start the ISO server (backed by above spec)
+* Run test_server in test.rs to start the ISO server (backed by above spec)
 
 ```
     Finished dev [unoptimized + debuginfo] target(s) in 1.77s
@@ -70,7 +70,7 @@ pan                 : 123456789101
 
 ## ISO TCP Client
 
-In a separate window run - src/iso8583/test_tcp_client.rs:13
+Now run src/iso8583/test.rs:32
 
 ```
 
