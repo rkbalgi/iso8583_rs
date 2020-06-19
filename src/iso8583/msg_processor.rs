@@ -23,7 +23,6 @@ impl MsgProcessor {
                 };
 
 
-
                 // process the incoming request based on amount
                 match iso_msg.bmp_child_value(4) {
                     Ok(amt) => {
@@ -50,6 +49,8 @@ impl MsgProcessor {
                             }
                             _ => {}
                         };
+
+                        iso_resp_msg.fd_map.insert("bitmap".to_string(), iso_resp_msg.bmp.as_vec());
                     }
                     Err(e) => {
                         iso_resp_msg.set("message_type", "1110");
