@@ -9,7 +9,7 @@ mod tests {
     use crate::iso8583::server::IsoServer;
 
     #[test]
-    fn test_server() -> Result<(),()> {
+    fn test_server() -> Result<(), ()> {
         let _ = simplelog::SimpleLogger::init(simplelog::LevelFilter::Debug, simplelog::Config::default());
 
         let iso_spec = crate::iso8583::iso_spec::spec("SampleSpec");
@@ -29,7 +29,7 @@ mod tests {
 
 
     #[test]
-    fn test_send_recv_iso() -> Result<(),Error> {
+    fn test_send_recv_iso() -> Result<(), Error> {
         let mut raw_msg: Vec<u8> = Vec::new();
 
         //make space for mli (swapped later)
@@ -39,8 +39,18 @@ mod tests {
         // message type
         "1100".as_bytes().read_to_end(&mut raw_msg);
 
+        let mut bmp = crate::iso8583::bitmap::new_bmp(0, 0, 0);
+        bmp.set_on(2);
+        bmp.set_on(3);
+        bmp.set_on(4);
+        bmp.set_on(11);
+        bmp.set_on(14);
+        bmp.set_on(52);
+        bmp.set_on(96);
+        bmp.set_on(160);
+
         //bitmap
-        raw_msg.write_all(hex::decode("7024000000000000").expect("failed to decode bmp").as_slice());
+        raw_msg.write_all(hex::decode(bmp.hex_string()).expect("failed to decode bmp").as_slice());
 
         //pan - with length indicator and data
         "12".as_bytes().read_to_end(&mut raw_msg);
@@ -57,6 +67,16 @@ mod tests {
 
         //expiration date
         "2204".as_bytes().read_to_end(&mut raw_msg);
+
+        if bmp.is_on(52){
+            "0102030405060708".as_bytes().read_to_end(&mut raw_msg);
+        }
+
+        //bit 96
+        "1234".as_bytes().read_to_end(&mut raw_msg);
+
+        //bit 160
+        "8888".as_bytes().read_to_end(&mut raw_msg);
 
 
         let mut mli: [u8; 2] = [0; 2];
@@ -83,7 +103,7 @@ mod tests {
         match reader.read_exact(&mut out_buf[..]) {
             Ok(()) => {
                 println!("received response:  {:?} with  {} bytes.", hex::encode(&out_buf), len);
-                match iso_spec::spec("SampleSpec").parse(out_buf) {
+                match iso_spec::spec("SampleSpec").parse(&mut out_buf) {
                     Ok(resp_iso_msg) => {
                         println!("parsed iso-response \"{}\" \n {} \n", resp_iso_msg.msg.name(), resp_iso_msg);
                     }

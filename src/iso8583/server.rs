@@ -25,7 +25,7 @@ pub struct IsoServer {
 
 impl IsoServer {
     pub fn start(&self) -> JoinHandle<()> {
-        //let iso_serv=*self;
+
         let cp = *self;
 
         std::thread::spawn(move || {
@@ -75,7 +75,7 @@ fn new_client(iso_server: IsoServer, stream_: TcpStream) {
                                     let data = &in_buf[0..mli as usize];
                                     debug!("received request len = {}  : data = {}", mli, hex::encode(data));
 
-                                    match iso_server.msg_processor.process(&iso_server, data.to_vec()) {
+                                    match iso_server.msg_processor.process(&iso_server, &mut data.to_vec()) {
                                         Ok(resp) => {
                                             debug!("iso_response \n raw:: {}, \n parsed:: \n {} \n ", hex::encode(&resp.0), resp.1);
 

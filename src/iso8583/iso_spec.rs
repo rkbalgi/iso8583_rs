@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use crate::iso8583::server::IsoServerError;
 use crate::iso8583::bitmap::Bitmap;
+use std::io::{BufReader, Cursor, Read};
 
 
 lazy_static! {
@@ -25,13 +26,16 @@ static ref ALL_SPECS: std::collections::HashMap<String,Spec> ={
                  name: "Authorization Request - 1100",
                  req_fields:  vec![
             Box::new(FixedField { name: "message_type".to_string(), len: 4, encoding: Encoding::ASCII ,position: 0}),
-            Box::new(bitmap::BmpField { name: "bitmap".to_string(), encoding: Encoding::ASCII ,
+            Box::new(bitmap::BmpField { name: "bitmap".to_string(), encoding: Encoding::BINARY ,
                  children: vec![
                                 Box::new(VarField { name: "pan".to_string(), len: 2, encoding: Encoding::ASCII, len_encoding: Encoding::ASCII, position:2 }),
                                 Box::new(FixedField { name: "proc_code".to_string(), len: 6, encoding: Encoding::ASCII, position:3 }),
                                 Box::new(FixedField { name: "amount".to_string(), len: 12, encoding: Encoding::ASCII, position:4 }),
                                 Box::new(FixedField { name: "stan".to_string(), len: 6, encoding: Encoding::ASCII, position:11 }),
                                 Box::new(FixedField { name: "expiration_date".to_string(), len: 4, encoding: Encoding::ASCII, position: 14 }),
+                                Box::new(FixedField { name: "pin_data".to_string(), len: 8, encoding: Encoding::BINARY, position: 52 }),
+                                Box::new(FixedField { name: "key_management_data".to_string(), len: 4, encoding: Encoding::ASCII, position: 96 }),
+                                Box::new(FixedField { name: "reserved_data".to_string(), len: 4, encoding: Encoding::ASCII, position: 160 }),
                                ]}),
 
         ]} /*end auth 1100 message*/,
@@ -40,7 +44,7 @@ static ref ALL_SPECS: std::collections::HashMap<String,Spec> ={
                  name: "Authorization Response - 1110",
                  req_fields:  vec![
             Box::new(FixedField { name: "message_type".to_string(), len: 4, encoding: Encoding::ASCII ,position: 0}),
-            Box::new(bitmap::BmpField { name: "bitmap".to_string(), encoding: Encoding::ASCII ,
+            Box::new(bitmap::BmpField { name: "bitmap".to_string(), encoding: Encoding::BINARY ,
                  children: vec![
                                 Box::new(VarField { name: "pan".to_string(), len: 2, encoding: Encoding::ASCII, len_encoding: Encoding::ASCII, position:2 }),
                                 Box::new(FixedField { name: "proc_code".to_string(), len: 6, encoding: Encoding::ASCII, position:3 }),
@@ -49,6 +53,8 @@ static ref ALL_SPECS: std::collections::HashMap<String,Spec> ={
                                 Box::new(FixedField { name: "expiration_date".to_string(), len: 4, encoding: Encoding::ASCII, position: 14 }),
                                 Box::new(FixedField { name: "approval_code".to_string(), len: 6, encoding: Encoding::ASCII, position:38 }),
                                 Box::new(FixedField { name: "action_code".to_string(), len: 3, encoding: Encoding::ASCII, position:39 }),
+                                Box::new(FixedField { name: "key_management_data".to_string(), len: 4, encoding: Encoding::ASCII, position: 96 }),
+                                Box::new(FixedField { name: "reserved_data".to_string(), len: 4, encoding: Encoding::ASCII, position: 160 }),
                                ]}),
 
         ]} /*end auth 1110 message*/,
@@ -123,11 +129,14 @@ impl Spec {
         return Err(IsoError { msg: format!("message not found for header - {}", header_val) });
     }
 
-    pub fn get_msg_segment(&'static self, data: &mut Vec<u8>) -> Result<&MessageSegment, IsoError> {
+    pub fn get_msg_segment(&'static self, data: &Vec<u8>) -> Result<&MessageSegment, IsoError> {
         let mut selector = String::new();
         let mut f2d_map = HashMap::new();
+
+        let mut in_buf = Cursor::new(data);
+
         for f in &self.header_fields {
-            match f.parse(data, &mut f2d_map) {
+            match f.parse(&mut in_buf, &mut f2d_map) {
                 Ok(_) => {
                     selector.extend(f.to_string(f2d_map.get(f.name()).unwrap()).chars());
                 }
@@ -280,10 +289,8 @@ pub fn spec(name: &str) -> &'static Spec {
 }
 
 impl Spec {
-    pub fn parse(&'static self, data: Vec<u8>) -> Result<IsoMsg, ParseError> {
-        let mut cp_data = data.clone();
-
-        let msg = self.get_msg_segment(&mut data.clone());
+    pub fn parse(&'static self, data: &mut Vec<u8>) -> Result<IsoMsg, ParseError> {
+        let msg = self.get_msg_segment(data);
         if msg.is_err() {
             return Err(ParseError { msg: msg.err().unwrap().msg });
         }
@@ -294,6 +301,8 @@ impl Spec {
             fd_map: HashMap::new(),
             bmp: bitmap::new_bmp(0, 0, 0),
         };
+
+        let mut cp_data = Cursor::new(data);
 
         for f in &iso_msg.msg.req_fields {
             debug!("parsing field : {}", f.name());
@@ -309,9 +318,10 @@ impl Spec {
             }
         }
 
-        if cp_data.len() > 0 {
-            warn!("residual data : {}", hex::encode(cp_data.iter()))
-        }
+        /*let res = cp_data.bytes().count();
+        if res > 0 {
+            warn!("residual data : {}", hex::encode(cp_data.bytes()..collect::<Vec<u8>>()))
+        }*/
 
         Ok(iso_msg)
     }

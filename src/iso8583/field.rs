@@ -2,6 +2,7 @@ use crate::iso8583::iso_spec::IsoMsg;
 use std::fmt;
 use crate::iso8583::field::Encoding::ASCII;
 use std::collections::HashMap;
+use std::io::{BufReader, Read, BufRead, Error};
 
 pub enum Encoding {
     ASCII,
@@ -25,7 +26,7 @@ impl fmt::Display for ParseError {
 
 pub trait Field: Sync {
     fn name(&self) -> &String;
-    fn parse(&self, in_buf: &mut Vec<u8>, f2d_map: &mut HashMap<String, Vec<u8>>) -> Result<(), ParseError>;
+    fn parse(&self, in_buf: &mut dyn BufRead, f2d_map: &mut HashMap<String, Vec<u8>>) -> Result<(), ParseError>;
     fn assemble(&self, out_buf: &mut Vec<u8>, iso_msg: &IsoMsg) -> Result<u32, ParseError>;
 
     fn position(&self) -> u32;
@@ -47,19 +48,18 @@ impl Field for FixedField {
         &self.name
     }
 
-    fn parse(self: &Self, in_buf: &mut Vec<u8>, f2d_map: &mut HashMap<String, Vec<u8>>) -> Result<(), ParseError> {
-        trace!("buf before_parse:: {}", hex::encode(in_buf.as_slice()));
-        if self.len < in_buf.capacity() as u32 {
-            let mut f_data = Vec::new();
-            for _ in 0..self.len {
-                f_data.push(in_buf.remove(0));
+    fn parse(self: &Self, in_buf: &mut dyn BufRead, f2d_map: &mut HashMap<String, Vec<u8>>) -> Result<(), ParseError> {
+        trace!("parsing ... {}", self.name);
+        let mut f_data = vec![0; self.len as usize];
+        match in_buf.read_exact(&mut f_data[..]) {
+            Ok(_) => {
+                trace!("parsed-data: {}", hex::encode(f_data.as_slice()));
+                f2d_map.insert(self.name.clone(), f_data);
+                Ok(())
             }
-            trace!("parsed-data: {}", hex::encode(f_data.as_slice()));
-            f2d_map.insert(self.name.clone(), f_data);
-
-            Ok(())
-        } else {
-            Err(ParseError { msg: format!("require {} but have {}", self.len, in_buf.capacity()) })
+            Err(_) => {
+                Err(ParseError { msg: format!("not enough data to parse - {}", self.name) })
+            }
         }
     }
 
@@ -139,29 +139,29 @@ impl Field for VarField
         &self.name
     }
 
-    fn parse(&self, in_buf: &mut Vec<u8>, f2d_map: &mut HashMap<String, Vec<u8>>) -> Result<(), ParseError> {
-        trace!("buf before_parse:: {}", hex::encode(in_buf.as_slice()));
+    fn parse(&self, in_buf: &mut dyn BufRead, f2d_map: &mut HashMap<String, Vec<u8>>) -> Result<(), ParseError> {
+        let mut len_data = vec![0; self.len as usize];
+        match in_buf.read_exact(&mut len_data[..]) {
+            Ok(_) => {
+                trace!("parsed-data (len-ind) : {}", hex::encode(&len_data));
 
-        if self.len < in_buf.capacity() as u32 {
-            let mut len_data = Vec::with_capacity(self.len as usize);
 
-            for _ in 0..self.len {
-                (len_data).push(in_buf.remove(0));
+                let data_len = self.data_len(&len_data);
+                let mut f_data = vec![0; data_len as usize];
+
+                match in_buf.read_exact(&mut f_data[..]) {
+                    Ok(_) => {
+                        f2d_map.insert(self.name.clone(), f_data);
+                        Ok(())
+                    }
+                    Err(e) => {
+                        Result::Err(ParseError { msg: format!("insufficient data, failed to parse {}", self.name) })
+                    }
+                }
             }
-            trace!("parsed-data (len-ind) : {}", hex::encode(&len_data));
-
-
-            let data_len = self.data_len(&len_data);
-            let mut f_data = Vec::with_capacity(data_len as usize);
-            for _ in 0..data_len {
-                (f_data).push(in_buf.remove(0));
+            Err(_) => {
+                Result::Err(ParseError { msg: format!("insufficient data, failed to parse length indicator for -  {}", self.name) })
             }
-
-            f2d_map.insert(self.name.clone(), f_data);
-
-            Ok(())
-        } else {
-            Result::Err(ParseError { msg: format!("require {} but have {}", self.len, in_buf.capacity()) })
         }
     }
 
