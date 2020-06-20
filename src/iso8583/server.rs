@@ -8,41 +8,54 @@ use log;
 use crate::iso8583::{bitmap, IsoError};
 use crate::iso8583::iso_spec::{IsoMsg, Spec};
 use crate::iso8583::msg_processor::MsgProcessor;
+use std::sync::Arc;
+use std::ops::Deref;
 
 pub struct IsoServerError {
     msg: String
 }
 
 
-
-#[derive(Copy, Clone)]
 pub struct IsoServer {
     sock_addr: SocketAddr,
-    pub (crate) spec: &'static crate::iso8583::iso_spec::Spec,
-    msg_processor: crate::iso8583::msg_processor::MsgProcessor,
+    pub(crate) spec: &'static crate::iso8583::iso_spec::Spec,
+    pub(crate) msg_processor: Box<dyn crate::iso8583::msg_processor::MsgProcessor>,
 }
 
 
 impl IsoServer {
     pub fn start(&self) -> JoinHandle<()> {
 
-        let cp = *self;
+
+        let iso_server_clone = IsoServer {
+            sock_addr: self.sock_addr.clone(),
+            spec: self.spec,
+            msg_processor: Box::new(self.msg_processor.deref()),
+        };
 
         std::thread::spawn(move || {
-            let listener = std::net::TcpListener::bind(cp.sock_addr).unwrap();
+
+
+            let listener = std::net::TcpListener::bind(iso_server_clone.sock_addr).unwrap();
 
             for stream in listener.incoming() {
                 let mut client = stream.unwrap();
                 debug!("Accepted new connection .. {:?}", &client.peer_addr());
-                new_client(cp, client);
+                new_client(&iso_server_clone, client);
             }
         })
     }
 }
 
 
-fn new_client(iso_server: IsoServer, stream_: TcpStream) {
-    std::thread::spawn(move || {
+fn new_client(iso_server: &IsoServer, stream_: TcpStream) {
+    let iso_server_clone = IsoServer {
+        sock_addr: iso_server.sock_addr.clone(),
+        spec: iso_server.spec,
+        msg_processor: Box::new(iso_server.msg_processor.as_ref()),
+    };
+
+    std::thread::spawn(move|| {
         let mut buf: [u8; 512] = [0; 512];
 
         let mut stream = stream_;
@@ -75,7 +88,7 @@ fn new_client(iso_server: IsoServer, stream_: TcpStream) {
                                     let data = &in_buf[0..mli as usize];
                                     debug!("received request len = {}  : data = {}", mli, hex::encode(data));
 
-                                    match iso_server.msg_processor.process(&iso_server, &mut data.to_vec()) {
+                                    match iso_server_clone.msg_processor.process(&iso_server_clone, &mut data.to_vec()) {
                                         Ok(resp) => {
                                             debug!("iso_response \n raw:: {}, \n parsed:: \n {} \n ", hex::encode(&resp.0), resp.1);
 
@@ -110,12 +123,12 @@ fn new_client(iso_server: IsoServer, stream_: TcpStream) {
     });
 }
 
-pub fn new(host_port: String, spec: &'static Spec) -> Result<IsoServer, IsoServerError> {
+pub fn new<'a>(host_port: String, msg_processor: Box<dyn MsgProcessor>, spec: &'static Spec) -> Result<Box<&'a IsoServer>, IsoServerError> {
     match host_port.to_socket_addrs() {
         Ok(mut i) => {
             match i.next() {
                 Some(ip_addr) => {
-                    Ok(IsoServer { sock_addr: ip_addr, spec, msg_processor: MsgProcessor {} })
+                    Ok(Box::new(&IsoServer { sock_addr: ip_addr, spec, msg_processor: msg_processor }))
                 }
                 None => {
                     Err(IsoServerError { msg: format!("invalid host_port: {} : unresolvable?", &host_port) })
