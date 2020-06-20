@@ -1,15 +1,23 @@
 #[cfg(test)]
 mod tests {
+    use std::io::{BufReader, Error, Read, Write};
     use std::net::TcpStream;
-    use std::io::{Write, Read, BufReader, Error};
     use std::time::Duration;
-    use byteorder::{WriteBytesExt, ReadBytesExt};
+
+    use byteorder::{ReadBytesExt};
     use byteorder::ByteOrder;
+
     use crate::iso8583::iso_spec;
     use crate::iso8583::server::IsoServer;
 
+
+
+
     #[test]
     fn test_server() -> Result<(), ()> {
+
+        std::env::set_var("SPEC_FILE","sample_spec/sample_spec.yaml");
+
         let _ = simplelog::SimpleLogger::init(simplelog::LevelFilter::Debug, simplelog::Config::default());
 
         let iso_spec = crate::iso8583::iso_spec::spec("SampleSpec");
@@ -30,6 +38,9 @@ mod tests {
 
     #[test]
     fn test_send_recv_iso() -> Result<(), Error> {
+
+        std::env::set_var("SPEC_FILE","sample_spec/sample_spec.yaml");
+
         let mut raw_msg: Vec<u8> = Vec::new();
 
         //make space for mli (swapped later)
@@ -68,7 +79,7 @@ mod tests {
         //expiration date
         "2204".as_bytes().read_to_end(&mut raw_msg);
 
-        if bmp.is_on(52){
+        if bmp.is_on(52) {
             "0102030405060708".as_bytes().read_to_end(&mut raw_msg);
         }
 

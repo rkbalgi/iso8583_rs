@@ -2,8 +2,11 @@ use crate::iso8583::iso_spec::IsoMsg;
 use std::fmt;
 use crate::iso8583::field::Encoding::ASCII;
 use std::collections::HashMap;
-use std::io::{BufReader, Read, BufRead, Error};
+use std::io::{BufReader, BufRead, Error};
 
+use serde::{Serialize,Deserialize};
+
+#[derive(Serialize,Deserialize,Copy, Clone)]
 pub enum Encoding {
     ASCII,
     EBCDIC,
@@ -38,6 +41,7 @@ pub trait Field: Sync {
 
 pub struct FixedField {
     pub name: String,
+    pub id: u32,
     pub len: u32,
     pub encoding: Encoding,
     pub position: u32,
@@ -99,6 +103,7 @@ impl Field for FixedField {
 
 pub struct VarField {
     pub name: String,
+    pub id: u32,
     //number of bytes in the length indicator
     pub len: u32,
     pub len_encoding: Encoding,

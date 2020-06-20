@@ -1,8 +1,10 @@
-use crate::iso8583::field::{Field, ParseError, Encoding};
-use byteorder::ByteOrder;
-use crate::iso8583::iso_spec;
 use std::collections::HashMap;
-use std::io::{BufReader, Read, BufRead};
+use std::io::{BufRead, BufReader};
+
+use byteorder::ByteOrder;
+
+use crate::iso8583::field::{Encoding, Field, ParseError};
+use crate::iso8583::iso_spec;
 
 #[derive(Debug)]
 pub struct Bitmap {
@@ -93,6 +95,7 @@ pub fn new_bmp(b1: u64, b2: u64, b3: u64) -> Bitmap {
 
 pub struct BmpField {
     pub name: String,
+    pub id: u32,
     pub encoding: Encoding,
     pub children: Vec<Box<dyn Field>>,
 }

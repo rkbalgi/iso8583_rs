@@ -1,12 +1,12 @@
-use std::net::{ToSocketAddrs, SocketAddr, TcpStream};
 use std::io::{Read, Write};
-use byteorder::{ByteOrder, WriteBytesExt};
-
-use crate::iso8583::iso_spec::{IsoMsg, Spec};
-use log;
-use std::collections::HashMap;
-use crate::iso8583::{bitmap, IsoError};
+use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::thread::JoinHandle;
+
+use byteorder::{ByteOrder, WriteBytesExt};
+use log;
+
+use crate::iso8583::{bitmap, IsoError};
+use crate::iso8583::iso_spec::{IsoMsg, Spec};
 use crate::iso8583::msg_processor::MsgProcessor;
 
 pub struct IsoServerError {
@@ -125,6 +125,8 @@ pub fn new(host_port: String, spec: &'static Spec) -> Result<IsoServer, IsoServe
         Err(e) => Err(IsoServerError { msg: format!("invalid host_port: {}: cause: {}", &host_port, e.to_string()) })
     }
 }
+
+
 
 
 

@@ -1,4 +1,3 @@
-//#![feature(vec_drain_as_slice)]
 #[macro_use]
 extern crate lazy_static;
 extern crate hex;
@@ -15,9 +14,12 @@ pub mod iso8583;
 
 fn main(){
 
-    let _ = simplelog::SimpleLogger::init(simplelog::LevelFilter::Trace, simplelog::Config::default());
 
-    let iso_spec = crate::iso8583::iso_spec::spec("SampleSpec");
+    std::env::set_var("SPEC_FILE","sample_spec\\sample_spec.yaml");
+
+    let _ = simplelog::SimpleLogger::init(simplelog::LevelFilter::Debug, simplelog::Config::default());
+
+    let iso_spec = crate::iso8583::iso_spec::spec("");
 
     info!("starting iso server for spec {} at port {}", iso_spec.name(), 6666);
     let server: IsoServer = match crate::iso8583::server::new("localhost:6666".to_string(), iso_spec) {

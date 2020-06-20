@@ -1,67 +1,36 @@
-use crate::iso8583::field::{FixedField, VarField, Field, Encoding, ParseError};
-use crate::iso8583::{bitmap, IsoError};
-
-
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
-use crate::iso8583::server::IsoServerError;
-use crate::iso8583::bitmap::Bitmap;
 use std::io::{BufReader, Cursor, Read};
 
+use crate::iso8583::{bitmap, IsoError};
+use crate::iso8583::bitmap::Bitmap;
+use crate::iso8583::field::{Encoding, Field, FixedField, ParseError, VarField};
+use crate::iso8583::yaml_de::{YMessageSegment, YField};
 
 lazy_static! {
 static ref ALL_SPECS: std::collections::HashMap<String,Spec> ={
 
-    let mut specs=HashMap::new();
+        println!("current-dir: {}",std::env::current_dir().unwrap().to_str().unwrap());
+        let mut spec_file = String::new();
 
-    //TODO:: externalize this into a spec (see sample_spec.yaml - WIP)
-    specs.insert("SampleSpec".to_string(),Spec {
-        name: "SampleSpec",
-        header_fields:vec![
-            Box::new(FixedField { name: "message_type".to_string(), len: 4, encoding: Encoding::ASCII ,position: 0}),
-            ],
-        messages: vec![
-          MessageSegment{
-                 selector: vec!["1100"],
-                 name: "Authorization Request - 1100",
-                 req_fields:  vec![
-            Box::new(FixedField { name: "message_type".to_string(), len: 4, encoding: Encoding::ASCII ,position: 0}),
-            Box::new(bitmap::BmpField { name: "bitmap".to_string(), encoding: Encoding::BINARY ,
-                 children: vec![
-                                Box::new(VarField { name: "pan".to_string(), len: 2, encoding: Encoding::ASCII, len_encoding: Encoding::ASCII, position:2 }),
-                                Box::new(FixedField { name: "proc_code".to_string(), len: 6, encoding: Encoding::ASCII, position:3 }),
-                                Box::new(FixedField { name: "amount".to_string(), len: 12, encoding: Encoding::ASCII, position:4 }),
-                                Box::new(FixedField { name: "stan".to_string(), len: 6, encoding: Encoding::ASCII, position:11 }),
-                                Box::new(FixedField { name: "expiration_date".to_string(), len: 4, encoding: Encoding::ASCII, position: 14 }),
-                                Box::new(FixedField { name: "pin_data".to_string(), len: 8, encoding: Encoding::BINARY, position: 52 }),
-                                Box::new(FixedField { name: "key_management_data".to_string(), len: 4, encoding: Encoding::ASCII, position: 96 }),
-                                Box::new(FixedField { name: "reserved_data".to_string(), len: 4, encoding: Encoding::ASCII, position: 160 }),
-                               ]}),
-
-        ]} /*end auth 1100 message*/,
-        MessageSegment{
-                 selector: vec!["1110"],
-                 name: "Authorization Response - 1110",
-                 req_fields:  vec![
-            Box::new(FixedField { name: "message_type".to_string(), len: 4, encoding: Encoding::ASCII ,position: 0}),
-            Box::new(bitmap::BmpField { name: "bitmap".to_string(), encoding: Encoding::BINARY ,
-                 children: vec![
-                                Box::new(VarField { name: "pan".to_string(), len: 2, encoding: Encoding::ASCII, len_encoding: Encoding::ASCII, position:2 }),
-                                Box::new(FixedField { name: "proc_code".to_string(), len: 6, encoding: Encoding::ASCII, position:3 }),
-                                Box::new(FixedField { name: "amount".to_string(), len: 12, encoding: Encoding::ASCII, position:4 }),
-                                Box::new(FixedField { name: "stan".to_string(), len: 6, encoding: Encoding::ASCII, position:11 }),
-                                Box::new(FixedField { name: "expiration_date".to_string(), len: 4, encoding: Encoding::ASCII, position: 14 }),
-                                Box::new(FixedField { name: "approval_code".to_string(), len: 6, encoding: Encoding::ASCII, position:38 }),
-                                Box::new(FixedField { name: "action_code".to_string(), len: 3, encoding: Encoding::ASCII, position:39 }),
-                                Box::new(FixedField { name: "key_management_data".to_string(), len: 4, encoding: Encoding::ASCII, position: 96 }),
-                                Box::new(FixedField { name: "reserved_data".to_string(), len: 4, encoding: Encoding::ASCII, position: 160 }),
-                               ]}),
-
-        ]} /*end auth 1110 message*/,
-          ] /*end messages*/,
+        match std::env::var_os("SPEC_FILE") {
+            Some(v) => {
+            spec_file.push_str(v.to_str().unwrap());
+            println!("spec-file: {}",spec_file)
+            }
+            None => panic!("SPEC_FILE env variable not defined!")
+            }
 
 
-    });
+
+    let mut specs=HashMap::<String,Spec>::new();
+
+    match crate::iso8583::yaml_de::read_spec(spec_file.as_str()){
+     Ok(spec)=>{
+      specs.insert(String::from(spec.name()),spec);
+     }
+     Err(e)=> panic!(e.msg)
+    };
 
     specs
 };
@@ -69,25 +38,47 @@ static ref ALL_SPECS: std::collections::HashMap<String,Spec> ={
 
 // Spec is the definition of the spec - layout of fields etc..
 pub struct Spec {
-    name: &'static str,
-    messages: Vec<MessageSegment>,
-    header_fields: Vec<Box<dyn Field>>,
+    pub(in crate::iso8583) name: String,
+    pub(in crate::iso8583) id: u32,
+    pub(in crate::iso8583) messages: Vec<MessageSegment>,
+    pub(in crate::iso8583) header_fields: Vec<Box<dyn Field>>,
 }
 
+
 pub struct MessageSegment {
-    name: &'static str,
-    selector: Vec<&'static str>,
-    req_fields: Vec<Box<dyn Field>>,
+    pub(in crate::iso8583) name: String,
+    pub(in crate::iso8583) id: u32,
+    pub(in crate::iso8583) selector: Vec<String>,
+    pub(in crate::iso8583) fields: Vec<Box<dyn Field>>,
+}
+
+
+impl From<&YMessageSegment> for MessageSegment {
+    fn from(yms: &YMessageSegment) -> Self {
+        let mut fields: Vec<Box<dyn Field>> = Vec::<Box<dyn Field>>::new();
+
+        yms.fields.iter().for_each(|f| {
+            fields.push(Into::<Box<dyn Field>>::into(f));
+        });
+
+
+        MessageSegment {
+            name: yms.name.clone(),
+            id: yms.id,
+            selector: yms.selector.iter().map(|s| s.clone()).collect(),
+            fields,
+        }
+    }
 }
 
 
 impl MessageSegment {
     pub fn name(&self) -> &str {
-        return self.name;
+        return self.name.as_str();
     }
 
     pub fn field_by_name(&self, name: &String) -> Result<&dyn Field, IsoError> {
-        match self.req_fields.iter().find(|field| -> bool{
+        match self.fields.iter().find(|field| -> bool{
             if field.name() == name {
                 true
             } else {
@@ -122,7 +113,7 @@ impl Spec {
 
     pub fn get_message_from_header(&self, header_val: &str) -> Result<&MessageSegment, IsoError> {
         for msg in &self.messages {
-            if msg.selector.contains(&header_val) {
+            if msg.selector.contains(&header_val.to_string()) {
                 return Ok(msg);
             }
         }
@@ -173,7 +164,7 @@ impl IsoMsg {
 
     // Returns the value of a field by position in the bitmap
     pub fn bmp_child_value(&self, pos: u32) -> Result<String, IsoError> {
-        let f = self.msg.req_fields.iter().find(|f| -> bool {
+        let f = self.msg.fields.iter().find(|f| -> bool {
             if f.name() == "bitmap" {
                 true
             } else {
@@ -194,7 +185,7 @@ impl IsoMsg {
 
     // Get the value of a top level field like message_type
     pub fn get_field_value(&self, name: &String) -> Result<String, IsoError> {
-        match self.msg.req_fields.iter().find(|f| -> bool {
+        match self.msg.fields.iter().find(|f| -> bool {
             if f.name() == name {
                 true
             } else {
@@ -258,7 +249,7 @@ impl IsoMsg {
 
     pub fn assemble(&self) -> Result<Vec<u8>, IsoError> {
         let mut out_buf: Vec<u8> = Vec::new();
-        for f in &self.msg.req_fields {
+        for f in &self.msg.fields {
             match f.assemble(&mut out_buf, &self) {
                 Ok(_) => {}
                 Err(e) => {
@@ -285,7 +276,8 @@ impl Display for IsoMsg {
 
 
 pub fn spec(name: &str) -> &'static Spec {
-    return ALL_SPECS.get(name).unwrap();
+    //TODO:: handle case of multiple specs, for now just return the first
+    ALL_SPECS.iter().find_map(|(k, v)| Some(v)).unwrap()
 }
 
 impl Spec {
@@ -304,7 +296,7 @@ impl Spec {
 
         let mut cp_data = Cursor::new(data);
 
-        for f in &iso_msg.msg.req_fields {
+        for f in &iso_msg.msg.fields {
             debug!("parsing field : {}", f.name());
             let res = match f.parse(&mut cp_data, &mut iso_msg.fd_map) {
                 Err(e) => Result::Err(e),

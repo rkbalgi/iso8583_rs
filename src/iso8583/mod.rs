@@ -4,6 +4,7 @@ pub mod iso_spec;
 pub mod server;
 mod test;
 mod msg_processor;
+mod yaml_de;
 
 #[derive(Debug)]
 pub struct IsoError{
