@@ -50,6 +50,7 @@ impl MsgProcessor for SampleMsgProcessor {
                                 } else {
                                     iso_resp_msg.set_on(39, "100");
                                 }
+                                iso_resp_msg.set_on(63, "007");
                             }
                             Err(e) => {
                                 iso_resp_msg.set_on(39, "107");

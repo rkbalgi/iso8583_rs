@@ -33,6 +33,7 @@ mod tests {
         bmp.set_on(14);
         bmp.set_on(19);
         bmp.set_on(52);
+        bmp.set_on(63);
         bmp.set_on(96);
         bmp.set_on(160);
 
@@ -61,6 +62,12 @@ mod tests {
 
         if bmp.is_on(52) {
             hex::decode("0102030405060708").unwrap().as_slice().read_to_end(&mut raw_msg);
+        }
+
+        if bmp.is_on(63) {
+            crate::iso8583::field::string_to_vec(&EBCDIC, "011").as_slice().read_to_end(&mut raw_msg);
+            "87877622525".as_bytes().read_to_end(&mut raw_msg);
+
         }
 
         //bit 96

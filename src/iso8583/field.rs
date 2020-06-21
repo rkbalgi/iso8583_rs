@@ -117,11 +117,15 @@ pub struct VarField {
 
 
 impl VarField {
+    //returns the length of data in the variable field
     fn data_len(&self, data: &Vec<u8>) -> usize
     {
         match self.len_encoding {
             Encoding::ASCII => {
                 String::from_utf8(data.clone()).expect("").parse::<usize>().unwrap()
+            }
+            Encoding::EBCDIC =>{
+                ebcdic_to_ascii(data).parse::<usize>().unwrap()
             }
             _ => unimplemented!("only ascii supported for length encoding on var fields"),
         }
@@ -137,7 +141,15 @@ impl VarField {
                     _ => unimplemented!("len-ind cannot exceed 3")
                 }
             }
-            _ => unimplemented!("only ascii supported for length encoding on var fields")
+            Encoding::EBCDIC => {
+                match self.len {
+                    1 => ascii_to_ebcdic(&mut format!("{:01}", len).into_bytes()),
+                    2 => ascii_to_ebcdic(&mut format!("{:02}", len).into_bytes()),
+                    3 => ascii_to_ebcdic(&mut format!("{:03}", len).into_bytes()),
+                    _ => unimplemented!("len-ind cannot exceed 3")
+                }
+            }
+            _ => unimplemented!("only ascii supported for length encoding on var fields - {:?}",self.len_encoding)
         }
     }
 }
@@ -225,9 +237,7 @@ pub(in crate::iso8583) fn vec_to_string(encoding: &Encoding, data: &Vec<u8>) -> 
             String::from_utf8(data.clone()).unwrap()
         }
         EBCDIC => {
-            let mut ascii_str = String::new();
-            data.iter().for_each(|f| ascii_str.push(char::from(encoding8::ebcdic::to_ascii(f.clone()))));
-            ascii_str
+            ebcdic_to_ascii(data)
         }
         BINARY => {
             hex::encode(data.as_slice())
@@ -237,6 +247,20 @@ pub(in crate::iso8583) fn vec_to_string(encoding: &Encoding, data: &Vec<u8>) -> 
         }
         _ => panic!("unsupported encoding - {:?}", encoding)
     }
+}
+
+fn ebcdic_to_ascii(data: &Vec<u8>) -> String {
+    let mut ascii_str = String::new();
+    data.iter().for_each(|f| ascii_str.push(char::from(encoding8::ebcdic::to_ascii(f.clone()))));
+    ascii_str
+}
+
+fn ascii_to_ebcdic(data: &mut Vec<u8>) ->Vec<u8>{
+
+    for i in 0..data.len() {
+        encoding8::ascii::make_ebcdic(data.get_mut(i).unwrap())
+    }
+    data.to_vec()
 }
 
 
