@@ -11,31 +11,109 @@ ISO8583 library written in Rust
 ## Usage: 
 ``` rust
 
+extern crate byteorder;
+extern crate hex;
 #[macro_use]
 extern crate lazy_static;
-extern crate hex;
-extern crate byteorder;
-
 #[macro_use]
 extern crate log;
 extern crate simplelog;
 
+use std::collections::HashMap;
 use std::time::Duration;
-use crate::iso8583::server::IsoServer;
 
-pub mod iso8583;
+use iso8583_rs::iso8583::{bitmap, IsoError};
+use iso8583_rs::iso8583::iso_spec::IsoMsg;
+use iso8583_rs::iso8583::msg_processor::MsgProcessor;
+use iso8583_rs::iso8583::server::IsoServer;
 
-fn main(){
+
+// Below is an example implementation of a MsgProcessor i.e the entity responsible for handling incoming messages
+// at the server
+#[derive(Copy, Clone)]
+pub struct SampleMsgProcessor {}
 
 
-    std::env::set_var("SPEC_FILE","sample_spec\\sample_spec.yaml");
+impl MsgProcessor for SampleMsgProcessor {
+    fn process(&self, iso_server: &IsoServer, msg: &mut Vec<u8>) -> Result<(Vec<u8>, IsoMsg), IsoError> {
+        match iso_server.spec.parse(msg) {
+            Ok(iso_msg) => {
+                debug!("parsed incoming request - message = \"{}\" successfully. \n : parsed message: \n --- \n {} \n ----\n",
+                       iso_msg.msg.name(), iso_msg);
+
+                let mut iso_resp_msg = IsoMsg {
+                    spec: &iso_msg.spec,
+                    msg: &iso_msg.spec.get_message_from_header("1110").unwrap(),
+                    fd_map: HashMap::new(),
+                    bmp: bitmap::new_bmp(0, 0, 0),
+                };
+
+
+                // process the incoming request based on amount
+                match iso_msg.bmp_child_value(4) {
+                    Ok(amt) => {
+                        iso_resp_msg.set("message_type", "1110");
+
+                        match amt.parse::<u32>() {
+                            Ok(i_amt) => {
+                                debug!("amount = {}", i_amt);
+                                if i_amt < 100 {
+                                    iso_resp_msg.set_on(38, "APPR01");
+                                    iso_resp_msg.set_on(39, "000");
+                                } else {
+                                    iso_resp_msg.set_on(39, "100");
+                                }
+                            }
+                            Err(e) => {
+                                iso_resp_msg.set_on(39, "107");
+                            }
+                        };
+
+                        match iso_resp_msg.echo_from(&iso_msg, &[2, 3, 4, 11, 14, 96]) {
+                            Err(e) => {
+                                error!("failed to echo fields into response. error = {}", "!");
+                            }
+                            _ => {}
+                        };
+
+                        iso_resp_msg.fd_map.insert("bitmap".to_string(), iso_resp_msg.bmp.as_vec());
+                    }
+                    Err(e) => {
+                        iso_resp_msg.set("message_type", "1110");
+                        iso_resp_msg.set_on(39, "115");
+                        match iso_resp_msg.echo_from(&iso_msg, &[2, 3, 4, 11, 14, 96]) {
+                            Err(e) => {
+                                error!("failed to echo fields into response. error = {}", "!");
+                            }
+                            _ => {}
+                        };
+                    }
+                }
+
+                match iso_resp_msg.assemble() {
+                    Ok(resp_data) => Ok((resp_data, iso_resp_msg)),
+                    Err(e) => {
+                        error!("Failed to assemble response message - {}", e.msg);
+                        Err(IsoError { msg: format!("error: msg assembly failed..{} ", e.msg) })
+                    }
+                }
+            }
+            Err(e) => {
+                Err(IsoError { msg: e.msg })
+            }
+        }
+    }
+}
+
+fn main() {
+    std::env::set_var("SPEC_FILE", "sample_spec\\sample_spec.yaml");
 
     let _ = simplelog::SimpleLogger::init(simplelog::LevelFilter::Debug, simplelog::Config::default());
 
-    let iso_spec = crate::iso8583::iso_spec::spec("");
+    let iso_spec = iso8583_rs::iso8583::iso_spec::spec("");
 
     info!("starting iso server for spec {} at port {}", iso_spec.name(), 6666);
-    let server: IsoServer = match crate::iso8583::server::new("localhost:6666".to_string(), iso_spec) {
+    let server: IsoServer = match iso8583_rs::iso8583::server::new("localhost:6666".to_string(), Box::new(SampleMsgProcessor {}), iso_spec) {
         Ok(server) => {
             server
         }
@@ -44,8 +122,9 @@ fn main(){
         }
     };
     server.start().join();
-
 }
+
+
 
 
 ```
@@ -59,76 +138,93 @@ fn main(){
 * Only ASCII encoding is supported at this time
 
 ## Run ISO Server
-* Run test_server in test.rs to start the ISO server (backed by above spec)
+* Run main.rs to start the ISO server (backed by above spec)
 
 ```
-    Finished dev [unoptimized + debuginfo] target(s) in 1.77s
+    Finished dev [unoptimized + debuginfo] target(s) in 2.22s
      Running `target\debug\iso8583_rs.exe`
-13:37:09 [INFO] starting iso server for spec SampleSpec at port 6666
-16:58:07 [DEBUG] (2) iso8583_rs::iso8583::server: Accepted new connection .. Ok(V6([::1]:59818))
-16:58:07 [DEBUG] (4) iso8583_rs::iso8583::server: received request len = 54  : data = 313130307024000000000000313231323334353637383931303130303430303030303030303030303031393937373935383132323034
-16:58:07 [DEBUG] (4) iso8583_rs::iso8583::iso_spec: computed header value for incoming message = 1100
-16:58:07 [DEBUG] (4) iso8583_rs::iso8583::iso_spec: parsing field : message_type
-16:58:07 [DEBUG] (4) iso8583_rs::iso8583::iso_spec: parsing field : bitmap
-16:58:07 [DEBUG] (4) iso8583_rs::iso8583::bitmap: parsing field - pan
-16:58:07 [DEBUG] (4) iso8583_rs::iso8583::bitmap: parsing field - proc_code
-16:58:07 [DEBUG] (4) iso8583_rs::iso8583::bitmap: parsing field - amount
-16:58:07 [DEBUG] (4) iso8583_rs::iso8583::bitmap: parsing field - stan
-16:58:07 [DEBUG] (4) iso8583_rs::iso8583::bitmap: parsing field - expiration_date
-16:58:07 [DEBUG] (4) iso8583_rs::iso8583::msg_processor: parsed incoming request - message = "Authorization Request - 1100" successfully. 
+current-dir: C:\Users\rkbal\IdeaProjects\iso8583_rs
+spec-file: sample_spec\sample_spec.yaml
+05:26:10 [INFO] starting iso server for spec SampleSpec at port 6666
+05:28:19 [DEBUG] (2) iso8583_rs::iso8583::server: Accepted new connection .. Ok(V6([::1]:56859))
+05:28:19 [DEBUG] (3) iso8583_rs::iso8583::server: received request len = 94  : data = 31313030f02400000000100080000001000000000000000100000000313231323334353637383931303130303430303030303030303030303031393937373935383132323034303130323033303430353036303730383132333438383838
+05:28:19 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: computed header value for incoming message = 1100
+05:28:19 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: parsing field : message_type
+05:28:19 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: parsing field : bitmap
+05:28:19 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - pan
+05:28:19 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - proc_code
+05:28:19 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - amount
+05:28:19 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - stan
+05:28:19 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - expiration_date
+05:28:19 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - pin_data
+05:28:19 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - key_mgmt_data
+05:28:19 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - reserved_data
+05:28:19 [DEBUG] (3) iso8583_rs: parsed incoming request - message = "1100 - Authorization" successfully. 
  : parsed message: 
  --- 
  
+reserved_data       : 0708 
 amount              : 000000000199 
-stan                : 779581 
-message_type        : 1100 
+bitmap              : f02400000000100080000001000000000000000100000000 
 expiration_date     : 2204 
-bitmap              : 7024000000000000 
+proc_code           : 004000 
+stan                : 779581 
+pin_data            : 3031303230333034 
+message_type        : 1100 
 pan                 : 123456789101 
-proc_code           : 004000  
+key_mgmt_data       : 0506  
  ----
 
-16:58:07 [DEBUG] (4) iso8583_rs::iso8583::msg_processor: amount = 199
-16:58:07 [DEBUG] (4) iso8583_rs::iso8583::iso_spec: echoing .. 2: 123456789101
-16:58:07 [DEBUG] (4) iso8583_rs::iso8583::iso_spec: echoing .. 3: 004000
-16:58:07 [DEBUG] (4) iso8583_rs::iso8583::iso_spec: echoing .. 4: 000000000199
-16:58:07 [DEBUG] (4) iso8583_rs::iso8583::iso_spec: echoing .. 11: 779581
-16:58:07 [DEBUG] (4) iso8583_rs::iso8583::iso_spec: echoing .. 14: 2204
-16:58:07 [DEBUG] (4) iso8583_rs::iso8583::server: iso_response 
- raw:: 313131307024000002000000313231323334353637383931303130303430303030303030303030303031393937373935383132323034313030, 
+05:28:19 [DEBUG] (3) iso8583_rs: amount = 199
+05:28:19 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: echoing .. 2: 123456789101
+05:28:19 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: echoing .. 3: 004000
+05:28:19 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: echoing .. 4: 000000000199
+05:28:19 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: echoing .. 11: 779581
+05:28:19 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: echoing .. 14: 2204
+05:28:19 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: echoing .. 96: 0506
+05:28:19 [DEBUG] (3) iso8583_rs::iso8583::server: iso_response 
+ raw:: 31313130f024000002000000000000010000000031323132333435363738393130313030343030303030303030303030303139393737393538313232303431303030353036, 
  parsed:: 
  
-amount              : 000000000199 
+pan                 : 123456789101 
 proc_code           : 004000 
-expiration_date     : 2204 
-action_code         : 100 
-message_type        : 1110 
 stan                : 779581 
-pan                 : 123456789101  
+expiration_date     : 2204 
+amount              : 000000000199 
+key_mgmt_data       : 0506 
+message_type        : 1110 
+bitmap              : f0240000020000000000000100000000 
+action_code         : 100  
  
-16:58:07 [INFO] client socket closed : [::1]:59818
+05:28:19 [INFO] client socket closed : [::1]:56859
+
 
 ``` 
 
 ## ISO TCP Client
 
-Now run src/iso8583/test.rs:32
+Now run src/iso8583/test.rs:test_send_recv_iso(..)
 
 ```
 
-Testing started at 22:27 ...
-raw iso msg = 0036313130307024000000000000313231323334353637383931303130303430303030303030303030303031393937373935383132323034
-received response:  "313131307024000002000000313231323334353637383931303130303430303030303030303030303031393937373935383132323034313030" with  57 bytes.
-parsed iso-response "Authorization Response - 1110" 
+Testing started at 10:58 ...
+raw iso msg = 005e31313030f02400000000100080000001000000000000000100000000313231323334353637383931303130303430303030303030303030303031393937373935383132323034303130323033303430353036303730383132333438383838
+received response:  "31313130f024000002000000000000010000000031323132333435363738393130313030343030303030303030303030303139393737393538313232303431303030353036" with  69 bytes.
+current-dir: C:\Users\rkbal\IdeaProjects\iso8583_rs
+spec-file: sample_spec/sample_spec.yaml
+parsed iso-response "1100 - Authorization" 
  
-expiration_date     : 2204 
-amount              : 000000000199 
 proc_code           : 004000 
-bitmap              : 7024000002000000 
+pan                 : 123456789101 
+bitmap              : f0240000020000000000000100000000 
+action_code         : 100 
+key_mgmt_data       : 0506 
+amount              : 000000000199 
 stan                : 779581 
 message_type        : 1110 
-pan                 : 123456789101 
-action_code         : 100  
+expiration_date     : 2204  
+
+
 
 ```
 

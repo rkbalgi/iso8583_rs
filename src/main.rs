@@ -1,23 +1,25 @@
+extern crate byteorder;
+extern crate hex;
 #[macro_use]
 extern crate lazy_static;
-extern crate hex;
-extern crate byteorder;
-
 #[macro_use]
 extern crate log;
 extern crate simplelog;
 
+use std::collections::HashMap;
 use std::time::Duration;
-use crate::iso8583::server::IsoServer;
 
-pub mod iso8583;
+use iso8583_rs::iso8583::{bitmap, IsoError};
+use iso8583_rs::iso8583::iso_spec::IsoMsg;
+use iso8583_rs::iso8583::msg_processor::MsgProcessor;
+use iso8583_rs::iso8583::server::IsoServer;
 
 
+// Below is an example implementation of a MsgProcessor i.e the entity responsible for handling incoming messages
+// at the server
 #[derive(Copy, Clone)]
 pub struct SampleMsgProcessor {}
 
-unsafe impl Sync for MsgProcessor{}
-unsafe impl Send for MsgProcessor{}
 
 impl MsgProcessor for SampleMsgProcessor {
     fn process(&self, iso_server: &IsoServer, msg: &mut Vec<u8>) -> Result<(Vec<u8>, IsoMsg), IsoError> {
@@ -95,10 +97,10 @@ fn main() {
 
     let _ = simplelog::SimpleLogger::init(simplelog::LevelFilter::Debug, simplelog::Config::default());
 
-    let iso_spec = crate::iso8583::iso_spec::spec("");
+    let iso_spec = iso8583_rs::iso8583::iso_spec::spec("");
 
     info!("starting iso server for spec {} at port {}", iso_spec.name(), 6666);
-    let server: IsoServer = **match crate::iso8583::server::new("localhost:6666".to_string(), Box::new(SampleMsgProcessor {}), iso_spec) {
+    let server: IsoServer = match iso8583_rs::iso8583::server::new("localhost:6666".to_string(), Box::new(SampleMsgProcessor {}), iso_spec) {
         Ok(server) => {
             server
         }

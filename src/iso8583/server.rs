@@ -18,24 +18,20 @@ pub struct IsoServerError {
 
 pub struct IsoServer {
     sock_addr: SocketAddr,
-    pub(crate) spec: &'static crate::iso8583::iso_spec::Spec,
-    pub(crate) msg_processor: Box<dyn crate::iso8583::msg_processor::MsgProcessor>,
+    pub spec: &'static crate::iso8583::iso_spec::Spec,
+    pub(crate) msg_processor: Arc<Box<dyn crate::iso8583::msg_processor::MsgProcessor>>,
 }
 
 
 impl IsoServer {
     pub fn start(&self) -> JoinHandle<()> {
-
-
         let iso_server_clone = IsoServer {
             sock_addr: self.sock_addr.clone(),
             spec: self.spec,
-            msg_processor: Box::new(self.msg_processor.deref()),
+            msg_processor: self.msg_processor.clone(),
         };
 
         std::thread::spawn(move || {
-
-
             let listener = std::net::TcpListener::bind(iso_server_clone.sock_addr).unwrap();
 
             for stream in listener.incoming() {
@@ -52,10 +48,10 @@ fn new_client(iso_server: &IsoServer, stream_: TcpStream) {
     let iso_server_clone = IsoServer {
         sock_addr: iso_server.sock_addr.clone(),
         spec: iso_server.spec,
-        msg_processor: Box::new(iso_server.msg_processor.as_ref()),
+        msg_processor: iso_server.msg_processor.clone(),
     };
 
-    std::thread::spawn(move|| {
+    std::thread::spawn(move || {
         let mut buf: [u8; 512] = [0; 512];
 
         let mut stream = stream_;
@@ -123,12 +119,12 @@ fn new_client(iso_server: &IsoServer, stream_: TcpStream) {
     });
 }
 
-pub fn new<'a>(host_port: String, msg_processor: Box<dyn MsgProcessor>, spec: &'static Spec) -> Result<Box<&'a IsoServer>, IsoServerError> {
+pub fn new<'a>(host_port: String, msg_processor: Box<dyn MsgProcessor>, spec: &'static Spec) -> Result<IsoServer, IsoServerError> {
     match host_port.to_socket_addrs() {
         Ok(mut i) => {
             match i.next() {
                 Some(ip_addr) => {
-                    Ok(Box::new(&IsoServer { sock_addr: ip_addr, spec, msg_processor: msg_processor }))
+                    Ok(IsoServer { sock_addr: ip_addr, spec, msg_processor: Arc::new(msg_processor) })
                 }
                 None => {
                     Err(IsoServerError { msg: format!("invalid host_port: {} : unresolvable?", &host_port) })

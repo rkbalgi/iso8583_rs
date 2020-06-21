@@ -3,7 +3,7 @@ pub mod field;
 pub mod iso_spec;
 pub mod server;
 mod test;
-mod msg_processor;
+pub mod msg_processor;
 mod yaml_de;
 
 #[derive(Debug)]
