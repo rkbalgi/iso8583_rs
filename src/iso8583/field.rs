@@ -33,6 +33,7 @@ pub trait Field: Sync {
     fn assemble(&self, out_buf: &mut Vec<u8>, iso_msg: &IsoMsg) -> Result<u32, ParseError>;
 
     fn position(&self) -> u32;
+    fn children(&self) -> Vec<&dyn Field>;
     fn child_by_pos(&self, pos: u32) -> &dyn Field;
     fn child_by_name(&self, name: &String) -> &dyn Field;
     fn to_string(&self, data: &Vec<u8>) -> String;
@@ -79,6 +80,11 @@ impl Field for FixedField {
 
     fn position(&self) -> u32 {
         return self.position;
+    }
+
+    fn children(&self) -> Vec<&dyn Field> {
+        //TODO:: when we choose to implement nested fields
+        vec![]
     }
 
     fn child_by_pos(&self, pos: u32) -> &dyn Field {
@@ -188,6 +194,13 @@ impl Field for VarField
     fn position(&self) -> u32 {
         return self.position;
     }
+
+
+    fn children(&self) -> Vec<&dyn Field> {
+        //TODO:: when we choose to implement nested fields
+        vec![]
+    }
+
 
     fn child_by_pos(&self, pos: u32) -> &dyn Field {
         unimplemented!()

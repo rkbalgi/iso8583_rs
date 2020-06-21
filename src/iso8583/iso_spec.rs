@@ -261,13 +261,28 @@ impl IsoMsg {
     }
 }
 
+fn collect_children(f: &dyn Field, ordered_fields: &mut Vec<String>) {
+    ordered_fields.push(f.name().clone());
+    f.children().iter().for_each(|f| collect_children(*f, ordered_fields));
+}
 
 impl Display for IsoMsg {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         let mut res = "".to_string();
-        for (f, v) in &(self.fd_map) {
-            let field = self.msg.field_by_name(f).unwrap();
-            res = res + format!("\n{:20.40}: {} ", f, field.to_string(v)).as_str();
+        let mut ordered_fields = vec![];
+        self.msg.fields.iter().for_each(|f| collect_children(f.as_ref(), &mut ordered_fields));
+
+        for f in ordered_fields {
+            if self.fd_map.contains_key(f.as_str()) {
+                let field = self.msg.field_by_name(&f).unwrap();
+                let field_value = &self.fd_map.get(f.as_str()).unwrap();
+                let mut pos_str: String = String::new();
+                if field.position() > 0 {
+                    pos_str = format!("[{:03}]", field.position());
+                }
+
+                res = res + format!("\n{:20.40} {:4}: {} ", f, pos_str.as_str(), field.to_string(field_value)).as_str();
+            }
         }
         f.write_str(&res).unwrap();
         Ok(())
