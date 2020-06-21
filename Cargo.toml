@@ -1,6 +1,6 @@
 [package]
 name = "iso8583_rs"
-version = "0.1.2"
+version = "0.1.3"
 authors = ["Raghavendra Balgi <rkbalgi@gmail.com>"]
 edition = "2018"
 description = "A library to define/parse/assemble and deliver (via TCP) an ISO8583 message"

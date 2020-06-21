@@ -36,7 +36,10 @@ pub trait Field: Sync {
     fn children(&self) -> Vec<&dyn Field>;
     fn child_by_pos(&self, pos: u32) -> &dyn Field;
     fn child_by_name(&self, name: &String) -> &dyn Field;
+
+    // field value to ASCII string
     fn to_string(&self, data: &Vec<u8>) -> String;
+    // field value as binary (wire format)
     fn to_raw(&self, val: &str) -> Vec<u8>;
 }
 
