@@ -63,6 +63,12 @@ messages:
             data_encoding: ASCII
             position: 14
 
+          - name: "country_code"
+            id: 17
+            type: Fixed
+            len: 3
+            data_encoding: EBCDIC
+            position: 19
 
           - name: "approval_code"
             id: 10
@@ -82,6 +88,32 @@ messages:
             len: 8
             data_encoding: BINARY
             position: 52
+
+          - name: "private_1"
+            id: 18
+            type: Variable
+            len: 2
+            len_encoding: BCD
+            data_encoding: ASCII
+            position: 61
+
+          - name: "private_2"
+            id: 18
+            type: Variable
+            len: 1
+            len_encoding: BINARY
+            data_encoding: EBCDIC
+            position: 62
+
+          - name: "private_3"
+            id: 18
+            type: Variable
+            len: 3
+            len_encoding: EBCDIC
+            data_encoding: ASCII
+            position: 63
+
+
           - name: "key_mgmt_data"
             id: 14
             type: Fixed

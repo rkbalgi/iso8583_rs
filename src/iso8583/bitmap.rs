@@ -232,6 +232,11 @@ impl Field for BmpField {
         0
     }
 
+    fn children(&self) -> Vec<&dyn Field> {
+        self.children.iter().map(|f| f.as_ref()).collect()
+    }
+
+
     fn child_by_pos(&self, pos: u32) -> &dyn Field {
         self.children.iter().find(|f| -> bool {
             if f.position() == pos {

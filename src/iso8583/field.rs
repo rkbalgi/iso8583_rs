@@ -1,12 +1,12 @@
 use crate::iso8583::iso_spec::IsoMsg;
 use std::fmt;
-use crate::iso8583::field::Encoding::ASCII;
+use crate::iso8583::field::Encoding::{ASCII, EBCDIC, BCD, BINARY};
 use std::collections::HashMap;
 use std::io::{BufReader, BufRead, Error};
 
-use serde::{Serialize,Deserialize};
+use serde::{Serialize, Deserialize};
 
-#[derive(Serialize,Deserialize,Copy, Clone)]
+#[derive(Serialize, Deserialize, Copy, Clone, Debug)]
 pub enum Encoding {
     ASCII,
     EBCDIC,
@@ -33,9 +33,13 @@ pub trait Field: Sync {
     fn assemble(&self, out_buf: &mut Vec<u8>, iso_msg: &IsoMsg) -> Result<u32, ParseError>;
 
     fn position(&self) -> u32;
+    fn children(&self) -> Vec<&dyn Field>;
     fn child_by_pos(&self, pos: u32) -> &dyn Field;
     fn child_by_name(&self, name: &String) -> &dyn Field;
+
+    // field value to ASCII string
     fn to_string(&self, data: &Vec<u8>) -> String;
+    // field value as binary (wire format)
     fn to_raw(&self, val: &str) -> Vec<u8>;
 }
 
@@ -53,11 +57,9 @@ impl Field for FixedField {
     }
 
     fn parse(self: &Self, in_buf: &mut dyn BufRead, f2d_map: &mut HashMap<String, Vec<u8>>) -> Result<(), ParseError> {
-        trace!("parsing ... {}", self.name);
         let mut f_data = vec![0; self.len as usize];
         match in_buf.read_exact(&mut f_data[..]) {
             Ok(_) => {
-                trace!("parsed-data: {}", hex::encode(f_data.as_slice()));
                 f2d_map.insert(self.name.clone(), f_data);
                 Ok(())
             }
@@ -81,6 +83,11 @@ impl Field for FixedField {
 
     fn position(&self) -> u32 {
         return self.position;
+    }
+
+    fn children(&self) -> Vec<&dyn Field> {
+        //TODO:: when we choose to implement nested fields
+        vec![]
     }
 
     fn child_by_pos(&self, pos: u32) -> &dyn Field {
@@ -113,11 +120,15 @@ pub struct VarField {
 
 
 impl VarField {
+    //returns the length of data in the variable field
     fn data_len(&self, data: &Vec<u8>) -> usize
     {
         match self.len_encoding {
             Encoding::ASCII => {
                 String::from_utf8(data.clone()).expect("").parse::<usize>().unwrap()
+            }
+            Encoding::EBCDIC =>{
+                ebcdic_to_ascii(data).parse::<usize>().unwrap()
             }
             _ => unimplemented!("only ascii supported for length encoding on var fields"),
         }
@@ -133,7 +144,15 @@ impl VarField {
                     _ => unimplemented!("len-ind cannot exceed 3")
                 }
             }
-            _ => unimplemented!("only ascii supported for length encoding on var fields")
+            Encoding::EBCDIC => {
+                match self.len {
+                    1 => ascii_to_ebcdic(&mut format!("{:01}", len).into_bytes()),
+                    2 => ascii_to_ebcdic(&mut format!("{:02}", len).into_bytes()),
+                    3 => ascii_to_ebcdic(&mut format!("{:03}", len).into_bytes()),
+                    _ => unimplemented!("len-ind cannot exceed 3")
+                }
+            }
+            _ => unimplemented!("only ascii supported for length encoding on var fields - {:?}",self.len_encoding)
         }
     }
 }
@@ -191,6 +210,13 @@ impl Field for VarField
         return self.position;
     }
 
+
+    fn children(&self) -> Vec<&dyn Field> {
+        //TODO:: when we choose to implement nested fields
+        vec![]
+    }
+
+
     fn child_by_pos(&self, pos: u32) -> &dyn Field {
         unimplemented!()
     }
@@ -208,26 +234,56 @@ impl Field for VarField
     }
 }
 
-fn vec_to_string(encoding: &Encoding, data: &Vec<u8>) -> String {
+pub(in crate::iso8583) fn vec_to_string(encoding: &Encoding, data: &Vec<u8>) -> String {
     match encoding {
         ASCII => {
             String::from_utf8(data.clone()).unwrap()
         }
-        _ => {
+        EBCDIC => {
+            ebcdic_to_ascii(data)
+        }
+        BINARY => {
             hex::encode(data.as_slice())
         }
+        BCD => {
+            hex::encode(data.as_slice())
+        }
+        _ => panic!("unsupported encoding - {:?}", encoding)
     }
 }
 
+fn ebcdic_to_ascii(data: &Vec<u8>) -> String {
+    let mut ascii_str = String::new();
+    data.iter().for_each(|f| ascii_str.push(char::from(encoding8::ebcdic::to_ascii(f.clone()))));
+    ascii_str
+}
 
-fn string_to_vec(encoding: &Encoding, data: &str) -> Vec<u8> {
+fn ascii_to_ebcdic(data: &mut Vec<u8>) ->Vec<u8>{
+
+    for i in 0..data.len() {
+        encoding8::ascii::make_ebcdic(data.get_mut(i).unwrap())
+    }
+    data.to_vec()
+}
+
+
+pub(in crate::iso8583) fn string_to_vec(encoding: &Encoding, data: &str) -> Vec<u8> {
     match encoding {
         ASCII => {
             data.to_string().into_bytes()
         }
-        _ => {
+        EBCDIC => {
+            let mut ebcdic = vec![];
+            (&mut data.to_string()).as_bytes().iter().for_each(|b| ebcdic.push(encoding8::ascii::to_ebcdic(b.clone())));
+            ebcdic
+        }
+        BINARY => {
             hex::decode(data).unwrap()
         }
+        BCD => {
+            hex::decode(data).unwrap()
+        }
+        _ => panic!("unsupported encoding - {:?}", encoding)
     }
 }
 

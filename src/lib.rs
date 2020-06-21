@@ -9,9 +9,6 @@ extern crate log;
 extern crate simplelog;
 extern crate serde_yaml;
 
-use std::time::Duration;
-use crate::iso8583::server::IsoServer;
-
 pub mod iso8583;
 
 
