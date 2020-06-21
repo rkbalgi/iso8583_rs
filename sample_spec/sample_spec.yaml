@@ -63,6 +63,12 @@ messages:
             data_encoding: ASCII
             position: 14
 
+          - name: "country_code"
+            id: 17
+            type: Fixed
+            len: 3
+            data_encoding: EBCDIC
+            position: 19
 
           - name: "approval_code"
             id: 10

@@ -1,12 +1,12 @@
 use crate::iso8583::iso_spec::IsoMsg;
 use std::fmt;
-use crate::iso8583::field::Encoding::ASCII;
+use crate::iso8583::field::Encoding::{ASCII, EBCDIC, BCD, BINARY};
 use std::collections::HashMap;
 use std::io::{BufReader, BufRead, Error};
 
-use serde::{Serialize,Deserialize};
+use serde::{Serialize, Deserialize};
 
-#[derive(Serialize,Deserialize,Copy, Clone)]
+#[derive(Serialize, Deserialize, Copy, Clone, Debug)]
 pub enum Encoding {
     ASCII,
     EBCDIC,
@@ -53,11 +53,9 @@ impl Field for FixedField {
     }
 
     fn parse(self: &Self, in_buf: &mut dyn BufRead, f2d_map: &mut HashMap<String, Vec<u8>>) -> Result<(), ParseError> {
-        trace!("parsing ... {}", self.name);
         let mut f_data = vec![0; self.len as usize];
         match in_buf.read_exact(&mut f_data[..]) {
             Ok(_) => {
-                trace!("parsed-data: {}", hex::encode(f_data.as_slice()));
                 f2d_map.insert(self.name.clone(), f_data);
                 Ok(())
             }
@@ -208,26 +206,44 @@ impl Field for VarField
     }
 }
 
-fn vec_to_string(encoding: &Encoding, data: &Vec<u8>) -> String {
+pub(in crate::iso8583) fn vec_to_string(encoding: &Encoding, data: &Vec<u8>) -> String {
     match encoding {
         ASCII => {
             String::from_utf8(data.clone()).unwrap()
         }
-        _ => {
+        EBCDIC => {
+            let mut ascii_str = String::new();
+            data.iter().for_each(|f| ascii_str.push(char::from(encoding8::ebcdic::to_ascii(f.clone()))));
+            ascii_str
+        }
+        BINARY => {
             hex::encode(data.as_slice())
         }
+        BCD => {
+            hex::encode(data.as_slice())
+        }
+        _ => panic!("unsupported encoding - {:?}", encoding)
     }
 }
 
 
-fn string_to_vec(encoding: &Encoding, data: &str) -> Vec<u8> {
+pub(in crate::iso8583) fn string_to_vec(encoding: &Encoding, data: &str) -> Vec<u8> {
     match encoding {
         ASCII => {
             data.to_string().into_bytes()
         }
-        _ => {
+        EBCDIC => {
+            let mut ebcdic = vec![];
+            (&mut data.to_string()).as_bytes().iter().for_each(|b| ebcdic.push(encoding8::ascii::to_ebcdic(b.clone())));
+            ebcdic
+        }
+        BINARY => {
             hex::decode(data).unwrap()
         }
+        BCD => {
+            hex::decode(data).unwrap()
+        }
+        _ => panic!("unsupported encoding - {:?}", encoding)
     }
 }
 

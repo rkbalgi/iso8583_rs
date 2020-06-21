@@ -9,14 +9,12 @@ mod tests {
 
     use crate::iso8583::iso_spec;
     use crate::iso8583::server::IsoServer;
-
-
+    use crate::iso8583::field::Encoding::EBCDIC;
 
 
     #[test]
     fn test_send_recv_iso() -> Result<(), Error> {
-
-        std::env::set_var("SPEC_FILE","sample_spec/sample_spec.yaml");
+        std::env::set_var("SPEC_FILE", "sample_spec/sample_spec.yaml");
 
         let mut raw_msg: Vec<u8> = Vec::new();
 
@@ -33,6 +31,7 @@ mod tests {
         bmp.set_on(4);
         bmp.set_on(11);
         bmp.set_on(14);
+        bmp.set_on(19);
         bmp.set_on(52);
         bmp.set_on(96);
         bmp.set_on(160);
@@ -56,8 +55,12 @@ mod tests {
         //expiration date
         "2204".as_bytes().read_to_end(&mut raw_msg);
 
+        //country_code (ebcdic field)
+        crate::iso8583::field::string_to_vec(&EBCDIC, "840").as_slice().read_to_end(&mut raw_msg);
+
+
         if bmp.is_on(52) {
-            "0102030405060708".as_bytes().read_to_end(&mut raw_msg);
+            hex::decode("0102030405060708").unwrap().as_slice().read_to_end(&mut raw_msg);
         }
 
         //bit 96

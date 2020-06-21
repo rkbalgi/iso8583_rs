@@ -56,7 +56,7 @@ impl MsgProcessor for SampleMsgProcessor {
                             }
                         };
 
-                        match iso_resp_msg.echo_from(&iso_msg, &[2, 3, 4, 11, 14, 96]) {
+                        match iso_resp_msg.echo_from(&iso_msg, &[2, 3, 4, 11, 14, 19, 96]) {
                             Err(e) => {
                                 error!("failed to echo fields into response. error = {}", "!");
                             }
@@ -68,7 +68,7 @@ impl MsgProcessor for SampleMsgProcessor {
                     Err(e) => {
                         iso_resp_msg.set("message_type", "1110");
                         iso_resp_msg.set_on(39, "115");
-                        match iso_resp_msg.echo_from(&iso_msg, &[2, 3, 4, 11, 14, 96]) {
+                        match iso_resp_msg.echo_from(&iso_msg, &[2, 3, 4, 11, 14, 19, 96]) {
                             Err(e) => {
                                 error!("failed to echo fields into response. error = {}", "!");
                             }

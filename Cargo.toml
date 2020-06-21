@@ -21,3 +21,4 @@ log = "0.4.8"
 simplelog = "0.8.0"
 serde = { version = "1.0.113", features = ["derive"] }
 serde_yaml = "0.8.13"
+encoding8 = "0.3.2"
