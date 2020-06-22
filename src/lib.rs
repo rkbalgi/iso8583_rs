@@ -1,4 +1,3 @@
-//#![feature(vec_drain_as_slice)]
 #[macro_use]
 extern crate lazy_static;
 extern crate hex;

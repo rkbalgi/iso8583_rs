@@ -7,13 +7,11 @@ extern crate log;
 extern crate simplelog;
 
 use std::collections::HashMap;
-use std::time::Duration;
 
 use iso8583_rs::iso8583::{bitmap, IsoError};
 use iso8583_rs::iso8583::iso_spec::IsoMsg;
-use iso8583_rs::iso8583::msg_processor::MsgProcessor;
 use iso8583_rs::iso8583::server::IsoServer;
-
+use iso8583_rs::iso8583::server::MsgProcessor;
 
 // Below is an example implementation of a MsgProcessor i.e the entity responsible for handling incoming messages
 // at the server
@@ -71,7 +69,7 @@ impl MsgProcessor for SampleMsgProcessor {
                         iso_resp_msg.set_on(39, "115");
                         match iso_resp_msg.echo_from(&iso_msg, &[2, 3, 4, 11, 14, 19, 96]) {
                             Err(e) => {
-                                error!("failed to echo fields into response. error = {}", "!");
+                                error!("failed to echo fields into response. error = {}", e.msg);
                             }
                             _ => {}
                         };
@@ -101,7 +99,9 @@ fn main() {
     let iso_spec = iso8583_rs::iso8583::iso_spec::spec("");
 
     info!("starting iso server for spec {} at port {}", iso_spec.name(), 6666);
-    let server: IsoServer = match iso8583_rs::iso8583::server::new("localhost:6666".to_string(), Box::new(SampleMsgProcessor {}), iso_spec) {
+    let server: IsoServer = match iso8583_rs::iso8583::server::new("localhost:6666".to_string(),
+                                                                   Box::new(iso8583_rs::iso8583::mli::MLI2E {}),
+                                                                   Box::new(SampleMsgProcessor {}), iso_spec) {
         Ok(server) => {
             server
         }

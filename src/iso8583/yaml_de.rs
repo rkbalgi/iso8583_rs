@@ -1,3 +1,4 @@
+//! This module contains implementation of spec deserialization logic from a YAML file
 use std::convert::TryInto;
 use std::io::Read;
 
@@ -45,7 +46,7 @@ impl Into<Box<dyn Field>> for &YField {
             "Bitmapped" => {
                 let mut children: Vec<Box<dyn Field>> = Vec::<Box<dyn Field>>::new();
                 if self.children.is_some() {
-                    let ychildren=&self.children.as_ref().unwrap();
+                    let ychildren = &self.children.as_ref().unwrap();
                     &ychildren.iter().for_each(|f| {
                         children.push(Into::<Box<dyn Field>>::into(f));
                     });
@@ -109,25 +110,6 @@ pub struct YMessageSegment {
     pub(crate) selector: Vec<String>,
     pub(crate) fields: Vec<YField>,
 }
-
-
-/*impl Into<MessageSegment> for YMessageSegment {
-    fn into(self) -> MessageSegment {
-        let mut fields: Vec<Box<dyn Field>> = vec![];
-        if self.fields.is_some() {
-            self.fields.iter().for_each(|f| {
-                fields.push(Box::new(f.into()));
-            })
-        }
-
-        MessageSegment {
-            name: self.name.as_str(),
-            id: self.id,
-            selector: self.selector.iter().map(|s| s.as_str()).collect(),
-            fields,
-        }
-    }
-}*/
 
 
 pub fn read_spec(spec_file: &str) -> Result<Spec, IsoError> {

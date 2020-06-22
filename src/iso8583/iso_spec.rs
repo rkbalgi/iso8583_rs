@@ -1,3 +1,5 @@
+//! This module contains implementation of specification, its segments and associated operations
+//!
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::io::{BufReader, Cursor, Read};
@@ -7,6 +9,7 @@ use crate::iso8583::bitmap::Bitmap;
 use crate::iso8583::field::{Encoding, Field, FixedField, ParseError, VarField};
 use crate::iso8583::yaml_de::{YMessageSegment, YField};
 
+/// Reads the spec definitions from YAML file
 lazy_static! {
 static ref ALL_SPECS: std::collections::HashMap<String,Spec> ={
 
@@ -36,7 +39,7 @@ static ref ALL_SPECS: std::collections::HashMap<String,Spec> ={
 };
 }
 
-// Spec is the definition of the spec - layout of fields etc..
+/// This struct is the definition of the specification - layout of fields etc..
 pub struct Spec {
     pub(in crate::iso8583) name: String,
     pub(in crate::iso8583) id: u32,
@@ -44,7 +47,7 @@ pub struct Spec {
     pub(in crate::iso8583) header_fields: Vec<Box<dyn Field>>,
 }
 
-
+/// This struct represents a segment in the Spec (a auth request, a response etc)
 pub struct MessageSegment {
     pub(in crate::iso8583) name: String,
     pub(in crate::iso8583) id: u32,
@@ -72,11 +75,14 @@ impl From<&YMessageSegment> for MessageSegment {
 }
 
 
+/// Operations on MessageSegment
 impl MessageSegment {
+    /// Returns name of segment
     pub fn name(&self) -> &str {
         return self.name.as_str();
     }
 
+    /// Returns a field given it's name if defined in the spec or a IsoError if the field is not found
     pub fn field_by_name(&self, name: &String) -> Result<&dyn Field, IsoError> {
         match self.fields.iter().find(|field| -> bool{
             if field.name() == name {
@@ -102,6 +108,7 @@ impl Spec {
         &self.name
     }
 
+    /// Returns a message segment given its name or a IsoError if such a segment is not present
     pub fn get_message(&self, name: &str) -> Result<&MessageSegment, IsoError> {
         for msg in &self.messages {
             if msg.name() == name {
@@ -111,6 +118,8 @@ impl Spec {
         return Err(IsoError { msg: format!("{} message not found", name) });
     }
 
+    /// Returns a message that corresponds to the given header value or an IsoError if such a selector
+    /// doesn't exist
     pub fn get_message_from_header(&self, header_val: &str) -> Result<&MessageSegment, IsoError> {
         for msg in &self.messages {
             if msg.selector.contains(&header_val.to_string()) {
@@ -120,6 +129,8 @@ impl Spec {
         return Err(IsoError { msg: format!("message not found for header - {}", header_val) });
     }
 
+    /// Returns a segment by first parsing the header field and then matching the header value against
+    /// the selector
     pub fn get_msg_segment(&'static self, data: &Vec<u8>) -> Result<&MessageSegment, IsoError> {
         let mut selector = String::new();
         let mut f2d_map = HashMap::new();
@@ -147,22 +158,25 @@ impl Spec {
     }
 }
 
-// IsoMsg represents a parsed message for a given spec
+/// This struct represents a parsed message for a given spec
 pub struct IsoMsg {
+    // The spec associated with this IsoMsg
     pub spec: &'static Spec,
+    /// The segment that the IsoMsg represents
     pub msg: &'static MessageSegment,
-    // field data map - name to raw value
+    /// field data map - name to raw value
     pub fd_map: std::collections::HashMap<String, Vec<u8>>,
-    // the bitmap on the iso message
+    /// the bitmap on the iso message
     pub bmp: bitmap::Bitmap,
 }
 
+/// Operations on IsoMsg
 impl IsoMsg {
     pub fn spec(&self) -> &'static Spec {
         self.spec
     }
 
-    // Returns the value of a field by position in the bitmap
+    /// Returns the value of a field by position in the bitmap
     pub fn bmp_child_value(&self, pos: u32) -> Result<String, IsoError> {
         let f = self.msg.fields.iter().find(|f| -> bool {
             if f.name() == "bitmap" {
@@ -183,7 +197,7 @@ impl IsoMsg {
         }
     }
 
-    // Get the value of a top level field like message_type
+    /// Returns the value of a top level field like message_type
     pub fn get_field_value(&self, name: &String) -> Result<String, IsoError> {
         match self.msg.fields.iter().find(|f| -> bool {
             if f.name() == name {
@@ -201,7 +215,7 @@ impl IsoMsg {
         }
     }
 
-    // sets a top-level field like message_type etc
+    /// sets a top-level field like message_type etc
     pub fn set(&mut self, name: &str, val: &str) -> Result<(), IsoError> {
         match self.msg.field_by_name(&name.to_string()) {
             Ok(f) => {
@@ -212,7 +226,7 @@ impl IsoMsg {
         }
     }
 
-    // Sets a field on the bitmap
+    /// Sets a field in the bitmap with the given value
     pub fn set_on(&mut self, pos: u32, val: &str) -> Result<(), IsoError> {
         match self.msg.field_by_name(&"bitmap".to_string()) {
             Ok(f) => {
@@ -225,6 +239,7 @@ impl IsoMsg {
         }
     }
 
+    /// Echoes (sets the value with the identical field in req_msg) for given positions in the bitmap
     pub fn echo_from(&mut self, req_msg: &IsoMsg, positions: &[u32]) -> Result<(), IsoError> {
         match self.msg.field_by_name(&"bitmap".to_string()) {
             Ok(f) => {
@@ -247,6 +262,7 @@ impl IsoMsg {
         }
     }
 
+    /// Assembles the messages into a Vec<u8> or a IsoError on failure
     pub fn assemble(&self) -> Result<Vec<u8>, IsoError> {
         let mut out_buf: Vec<u8> = Vec::new();
         for f in &self.msg.fields {
@@ -289,13 +305,14 @@ impl Display for IsoMsg {
     }
 }
 
-
+/// Returns a spec given its name
 pub fn spec(name: &str) -> &'static Spec {
     //TODO:: handle case of multiple specs, for now just return the first
     ALL_SPECS.iter().find_map(|(k, v)| Some(v)).unwrap()
 }
 
 impl Spec {
+    /// Returns a IsoMsg after parsing data or an ParseError on failure
     pub fn parse(&'static self, data: &mut Vec<u8>) -> Result<IsoMsg, ParseError> {
         let msg = self.get_msg_segment(data);
         if msg.is_err() {
@@ -324,12 +341,6 @@ impl Spec {
                 return Result::Err(res.err().unwrap());
             }
         }
-
-        /*let res = cp_data.bytes().count();
-        if res > 0 {
-            warn!("residual data : {}", hex::encode(cp_data.bytes()..collect::<Vec<u8>>()))
-        }*/
-
         Ok(iso_msg)
     }
 }
