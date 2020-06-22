@@ -1,20 +1,16 @@
 //! This module contains the implementation of a ISO server (TCP)
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
+use std::sync::Arc;
 use std::thread::JoinHandle;
 
-use byteorder::{ByteOrder, WriteBytesExt};
-use log;
-
-use crate::iso8583::{bitmap, IsoError};
+use crate::iso8583::{IsoError};
 use crate::iso8583::iso_spec::{IsoMsg, Spec};
-use std::sync::Arc;
-use std::ops::Deref;
 use crate::iso8583::mli::MLI;
 
 /// This struct represents an error associated with server errors
 pub struct IsoServerError {
-    msg: String
+    pub msg: String
 }
 
 /// This struct represents a IsoServer
@@ -47,7 +43,7 @@ impl IsoServer {
             let listener = std::net::TcpListener::bind(iso_server_clone.sock_addr).unwrap();
 
             for stream in listener.incoming() {
-                let mut client = stream.unwrap();
+                let client = stream.unwrap();
                 debug!("Accepted new connection .. {:?}", &client.peer_addr());
                 new_client(&iso_server_clone, client);
             }
@@ -88,7 +84,7 @@ fn new_client(iso_server: &IsoServer, stream_: TcpStream) {
                                         mli = n;
                                         reading_mli = false;
                                     }
-                                    Err(e) => {}
+                                    Err(_e) => {}
                                 }
                             } else {
                                 //reading data
@@ -103,13 +99,12 @@ fn new_client(iso_server: &IsoServer, stream_: TcpStream) {
 
                                             match iso_server_clone.mli.create(&(resp.0).len()) {
                                                 Ok(mut resp_data) => {
-                                                    (&mut resp_data).write_all(resp.0.as_slice());
-                                                    stream.write_all(resp_data.as_slice());
+                                                    (&mut resp_data).write_all(resp.0.as_slice()).unwrap();
+                                                    stream.write_all(resp_data.as_slice()).unwrap();
                                                 }
                                                 Err(e) => {
                                                     error!("failed to construct mli {}", e.msg)
                                                 }
-                                                _ => {}
                                             }
                                         }
                                         Err(e) => {

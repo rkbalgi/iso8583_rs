@@ -1,5 +1,4 @@
 //! This module contains implementation of spec deserialization logic from a YAML file
-use std::convert::TryInto;
 use std::io::Read;
 
 use serde::{Deserialize, Serialize};
@@ -116,7 +115,7 @@ pub fn read_spec(spec_file: &str) -> Result<Spec, IsoError> {
     match std::fs::File::open(spec_file) {
         Ok(f) => {
             let mut yaml_str = String::new();
-            (&f).read_to_string(&mut yaml_str);
+            let _ = (&f).read_to_string(&mut yaml_str);
 
             match serde_yaml::from_str::<YSpec>(&yaml_str) {
                 Ok(y_spec) => {

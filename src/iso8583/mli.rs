@@ -37,7 +37,7 @@ impl MLI for MLI2E {
 
     fn create(&self, n: &usize) -> Result<Vec<u8>, IsoError> {
         let mut mli = Vec::<u8>::new();
-        mli.write_u16::<byteorder::BigEndian>(n.clone() as u16);
+        let _ = mli.write_u16::<byteorder::BigEndian>(n.clone() as u16);
         Ok(mli)
     }
 }
@@ -55,7 +55,7 @@ impl MLI for MLI4E {
 
     fn create(&self, n: &usize) -> Result<Vec<u8>, IsoError> {
         let mut mli = Vec::<u8>::new();
-        mli.write_u32::<byteorder::BigEndian>(n.clone() as u32);
+        let _ = mli.write_u32::<byteorder::BigEndian>(n.clone() as u32);
         Ok(mli)
     }
 }
@@ -74,7 +74,7 @@ impl MLI for MLI2I {
 
     fn create(&self, n: &usize) -> Result<Vec<u8>, IsoError> {
         let mut mli = Vec::<u8>::new();
-        mli.write_u16::<byteorder::BigEndian>((n.clone() as u16) + 2);
+        let _ = mli.write_u16::<byteorder::BigEndian>((n.clone() as u16) + 2);
         Ok(mli)
     }
 }
@@ -93,7 +93,7 @@ impl MLI for MLI4I {
 
     fn create(&self, n: &usize) -> Result<Vec<u8>, IsoError> {
         let mut mli = Vec::<u8>::new();
-        mli.write_u32::<byteorder::BigEndian>((n.clone() as u32) + 4);
+        let _ = mli.write_u32::<byteorder::BigEndian>((n.clone() as u32) + 4);
         Ok(mli)
     }
 }

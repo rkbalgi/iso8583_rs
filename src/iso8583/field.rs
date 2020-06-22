@@ -4,7 +4,7 @@ use crate::iso8583::iso_spec::IsoMsg;
 use std::fmt;
 use crate::iso8583::field::Encoding::{ASCII, EBCDIC, BCD, BINARY};
 use std::collections::HashMap;
-use std::io::{BufReader, BufRead, Error};
+use std::io::{BufRead};
 
 use serde::{Serialize, Deserialize};
 
@@ -110,15 +110,14 @@ impl Field for FixedField {
     }
 
     fn children(&self) -> Vec<&dyn Field> {
-        //TODO:: when we choose to implement nested fields
-        vec![]
+        unimplemented!("nested fields not supported for {}", self.name)
     }
 
-    fn child_by_pos(&self, pos: u32) -> &dyn Field {
+    fn child_by_pos(&self, _pos: u32) -> &dyn Field {
         unimplemented!()
     }
 
-    fn child_by_name(&self, name: &String) -> &dyn Field {
+    fn child_by_name(&self, _name: &String) -> &dyn Field {
         unimplemented!()
     }
 
@@ -208,7 +207,7 @@ impl Field for VarField
                         Ok(())
                     }
                     Err(e) => {
-                        Result::Err(ParseError { msg: format!("insufficient data, failed to parse {}", self.name) })
+                        Result::Err(ParseError { msg: format!("insufficient data, failed to parse {}, Error = {}", self.name, e.to_string()) })
                     }
                 }
             }
@@ -241,16 +240,15 @@ impl Field for VarField
 
 
     fn children(&self) -> Vec<&dyn Field> {
-        //TODO:: when we choose to implement nested fields
-        vec![]
+        unimplemented!("nested fields not supported for {}", self.name)
     }
 
 
-    fn child_by_pos(&self, pos: u32) -> &dyn Field {
+    fn child_by_pos(&self, _pos: u32) -> &dyn Field {
         unimplemented!()
     }
 
-    fn child_by_name(&self, name: &String) -> &dyn Field {
+    fn child_by_name(&self, _name: &String) -> &dyn Field {
         unimplemented!()
     }
 
@@ -277,7 +275,6 @@ pub(in crate::iso8583) fn vec_to_string(encoding: &Encoding, data: &Vec<u8>) -> 
         BCD => {
             hex::encode(data.as_slice())
         }
-        _ => panic!("unsupported encoding - {:?}", encoding)
     }
 }
 
@@ -311,7 +308,6 @@ pub(in crate::iso8583) fn string_to_vec(encoding: &Encoding, data: &str) -> Vec<
         BCD => {
             hex::decode(data).unwrap()
         }
-        _ => panic!("unsupported encoding - {:?}", encoding)
     }
 }
 

@@ -2,12 +2,11 @@
 //!
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
-use std::io::{BufReader, Cursor, Read};
+use std::io::Cursor;
 
 use crate::iso8583::{bitmap, IsoError};
-use crate::iso8583::bitmap::Bitmap;
-use crate::iso8583::field::{Encoding, Field, FixedField, ParseError, VarField};
-use crate::iso8583::yaml_de::{YMessageSegment, YField};
+use crate::iso8583::field::{Field, ParseError};
+use crate::iso8583::yaml_de::YMessageSegment;
 
 /// Reads the spec definitions from YAML file
 lazy_static! {
@@ -306,9 +305,9 @@ impl Display for IsoMsg {
 }
 
 /// Returns a spec given its name
-pub fn spec(name: &str) -> &'static Spec {
+pub fn spec(_name: &str) -> &'static Spec {
     //TODO:: handle case of multiple specs, for now just return the first
-    ALL_SPECS.iter().find_map(|(k, v)| Some(v)).unwrap()
+    ALL_SPECS.iter().find_map(|(_k, v)| Some(v)).unwrap()
 }
 
 impl Spec {
@@ -332,7 +331,7 @@ impl Spec {
             debug!("parsing field : {}", f.name());
             let res = match f.parse(&mut cp_data, &mut iso_msg.fd_map) {
                 Err(e) => Result::Err(e),
-                Ok(r) => {
+                Ok(_) => {
                     Ok(())
                 }
             };

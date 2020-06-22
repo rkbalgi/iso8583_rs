@@ -1,6 +1,6 @@
 //! This module provides implementation of types for handling ISO bitmaps and Bitmapped fields
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead};
 
 use byteorder::ByteOrder;
 
@@ -184,7 +184,7 @@ impl Field for BmpField {
                             Ok(f) => {
                                 debug!("parsing field - {}", f.name());
                                 match f.parse(in_buf, f2d_map) {
-                                    Ok(r) => {
+                                    Ok(_) => {
                                         Ok(())
                                     }
                                     Err(e) => Err(e),
@@ -222,8 +222,13 @@ impl Field for BmpField {
                 match self.by_position(pos) {
                     Ok(f) => {
                         match iso_msg.fd_map.get(f.name()) {
-                            Some(fd) => {
-                                f.assemble(out_buf, iso_msg);
+                            Some(_) => {
+                                match f.assemble(out_buf, iso_msg) {
+                                    Ok(_) => {}
+                                    Err(e) => {
+                                        return Err(ParseError { msg: format!("failed to assemble field {}, {}", f.name(), e.msg) });
+                                    }
+                                }
                             }
                             None => { return Err(ParseError { msg: format!("position {} is on, but no field data present!", pos) }); }
                         };
@@ -269,7 +274,7 @@ impl Field for BmpField {
         hex::encode(data)
     }
 
-    fn to_raw(&self, val: &str) -> Vec<u8> {
+    fn to_raw(&self, _val: &str) -> Vec<u8> {
         unimplemented!()
     }
 }
