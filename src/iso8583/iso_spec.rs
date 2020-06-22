@@ -8,7 +8,7 @@ use crate::iso8583::{bitmap, IsoError};
 use crate::iso8583::field::{Field, ParseError};
 use crate::iso8583::yaml_de::YMessageSegment;
 
-/// Reads the spec definitions from YAML file
+// Reads the spec definitions from YAML file
 lazy_static! {
 static ref ALL_SPECS: std::collections::HashMap<String,Spec> ={
 
@@ -17,20 +17,19 @@ static ref ALL_SPECS: std::collections::HashMap<String,Spec> ={
 
         match std::env::var_os("SPEC_FILE") {
             Some(v) => {
-            spec_file.push_str(v.to_str().unwrap());
-            println!("spec-file: {}",spec_file)
+               spec_file.push_str(v.to_str().unwrap());
+               println!("spec-file: {}",spec_file)
             }
+
             None => panic!("SPEC_FILE env variable not defined!")
-            }
+        }
 
 
 
     let mut specs=HashMap::<String,Spec>::new();
 
     match crate::iso8583::yaml_de::read_spec(spec_file.as_str()){
-     Ok(spec)=>{
-      specs.insert(String::from(spec.name()),spec);
-     }
+     Ok(spec)=> specs.insert(String::from(spec.name()),spec),
      Err(e)=> panic!(e.msg)
     };
 
@@ -41,6 +40,7 @@ static ref ALL_SPECS: std::collections::HashMap<String,Spec> ={
 /// This struct is the definition of the specification - layout of fields etc..
 pub struct Spec {
     pub(in crate::iso8583) name: String,
+    #[allow(dead_code)]
     pub(in crate::iso8583) id: u32,
     pub(in crate::iso8583) messages: Vec<MessageSegment>,
     pub(in crate::iso8583) header_fields: Vec<Box<dyn Field>>,
@@ -49,6 +49,7 @@ pub struct Spec {
 /// This struct represents a segment in the Spec (a auth request, a response etc)
 pub struct MessageSegment {
     pub(in crate::iso8583) name: String,
+    #[allow(dead_code)]
     pub(in crate::iso8583) id: u32,
     pub(in crate::iso8583) selector: Vec<String>,
     pub(in crate::iso8583) fields: Vec<Box<dyn Field>>,
