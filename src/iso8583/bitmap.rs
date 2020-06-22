@@ -6,6 +6,7 @@ use byteorder::ByteOrder;
 
 use crate::iso8583::field::{Encoding, Field, ParseError};
 use crate::iso8583::{iso_spec, IsoError};
+use crate::iso8583::server::new;
 
 /// This struct represents a bitmap that can support 192 (64*3) fields
 #[derive(Debug)]
@@ -96,6 +97,27 @@ pub fn new_bmp(b1: u64, b2: u64, b3: u64) -> Bitmap {
         s_bmp: b2,
         t_bmp: b3,
     }
+}
+
+
+pub fn from_vec(bmp_data: &Vec<u8>) -> Bitmap {
+    println!("{}",bmp_data.len());
+    assert!(bmp_data.len() >= 8 && bmp_data.len() <= 24);
+    let mut b1: u64 = 0;
+    let mut b2: u64 = 02;
+    let mut b3: u64 = 0;
+
+
+    if bmp_data.len() == 1 {
+        b1 = byteorder::BigEndian::read_u64(&bmp_data[0..8]);
+    }
+    if bmp_data.len() == 2 {
+        b2 = byteorder::BigEndian::read_u64(&bmp_data[8..16]);
+    }
+    if bmp_data.len() == 3 {
+        b3 = byteorder::BigEndian::read_u64(&bmp_data[16..]);
+    }
+    new_bmp(b1, b2, b3)
 }
 
 /// This struct represents a bitmapped field in the ISO message

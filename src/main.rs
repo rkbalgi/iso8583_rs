@@ -48,6 +48,18 @@ impl MsgProcessor for SampleMsgProcessor {
                                 } else {
                                     iso_resp_msg.set_on(39, "100").unwrap_or_default();
                                 }
+
+                                if iso_msg.bmp.is_on(61) {
+                                    let mut val = iso_msg.bmp_child_value(61).unwrap();
+                                    val.push_str(" - OK");
+                                    iso_resp_msg.set_on(61, val.as_str()).unwrap_or_default();
+                                }
+                                if iso_msg.bmp.is_on(62) {
+                                    let mut val = iso_msg.bmp_child_value(62).unwrap();
+                                    val.push_str(" - OK");
+                                    iso_resp_msg.set_on(62, val.as_str()).unwrap_or_default();
+                                }
+
                                 iso_resp_msg.set_on(63, "007").unwrap_or_default();
                             }
                             Err(_e) => {

@@ -19,9 +19,7 @@ messages:
         type: Fixed
         len: 4
         data_encoding: ASCII
-        constraints:
-          content_type: Numeric
-        children: []
+
       - name: "bitmap"
         id: 2
         type: Bitmapped
@@ -35,12 +33,14 @@ messages:
             len_encoding: ASCII
             data_encoding: ASCII
             position: 2
+
           - name: "proc_code"
             id: 4
             type: Fixed
             len: 6
             data_encoding: ASCII
             position: 3
+
           - name: "amount"
             id: 8
             type: Fixed
@@ -76,12 +76,14 @@ messages:
             len: 6
             data_encoding: ASCII
             position: 38
+
           - name: "action_code"
             id: 11
             type: Fixed
             len: 3
             data_encoding: ASCII
             position: 39
+
           - name: "pin_data"
             id: 12
             type: Fixed
@@ -98,7 +100,7 @@ messages:
             position: 61
 
           - name: "private_2"
-            id: 18
+            id: 19
             type: Variable
             len: 1
             len_encoding: BINARY
@@ -106,13 +108,12 @@ messages:
             position: 62
 
           - name: "private_3"
-            id: 18
+            id: 20
             type: Variable
             len: 3
             len_encoding: EBCDIC
             data_encoding: ASCII
             position: 63
-
 
           - name: "key_mgmt_data"
             id: 14
@@ -120,6 +121,7 @@ messages:
             len: 4
             data_encoding: ASCII
             position: 96
+
           - name: "reserved_data"
             id: 14
             type: Fixed

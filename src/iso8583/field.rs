@@ -4,9 +4,12 @@ use crate::iso8583::iso_spec::IsoMsg;
 use std::fmt;
 use crate::iso8583::field::Encoding::{ASCII, EBCDIC, BCD, BINARY};
 use std::collections::HashMap;
-use std::io::{BufRead};
+use std::io::{BufRead, BufReader, Write};
 
 use serde::{Serialize, Deserialize};
+use byteorder::ByteOrder;
+
+use log;
 
 /// This enum represents the encoding of a field (or length indicator for variable fields)
 #[derive(Serialize, Deserialize, Copy, Clone, Debug)]
@@ -110,7 +113,8 @@ impl Field for FixedField {
     }
 
     fn children(&self) -> Vec<&dyn Field> {
-        unimplemented!("nested fields not supported for {}", self.name)
+        //unimplemented!("nested fields not supported for {}", self.name)
+        vec![]
     }
 
     fn child_by_pos(&self, _pos: u32) -> &dyn Field {
@@ -157,7 +161,20 @@ impl VarField {
             Encoding::EBCDIC => {
                 ebcdic_to_ascii(data).parse::<usize>().unwrap()
             }
-            _ => unimplemented!("only ascii supported for length encoding on var fields"),
+            Encoding::BINARY => {
+                match data.len() {
+                    1 => data[0] as usize,
+                    2 => byteorder::BigEndian::read_u16(&data[..]) as usize,
+                    _ => panic!("Cannot support more than 2 bytes of length indicator when expressed in binary")
+                }
+            }
+            Encoding::BCD => {
+                match data.len() {
+                    1 => hex::encode(data).parse::<usize>().unwrap(),
+                    2 => hex::encode(data).parse::<usize>().unwrap(),
+                    _ => panic!("Cannot support more than 2 bytes (4 BCD digits) of length indicator when expressed in bcd")
+                }
+            }
         }
     }
 
@@ -180,6 +197,29 @@ impl VarField {
                     _ => unimplemented!("len-ind cannot exceed 3")
                 }
             }
+
+            Encoding::BINARY => {
+                let mut len_ind = Vec::<u8>::new();
+                match self.len {
+                    1 => {
+                        len_ind.write(&vec![len as u8]).unwrap();
+                        len_ind
+                    }
+                    2 => {
+                        byteorder::BigEndian::write_u16(&mut len_ind, len as u16);
+                        len_ind
+                    }
+                    _ => panic!("Cannot support more than 2 bytes of length indicator when expressed in binary")
+                }
+            }
+            Encoding::BCD => {
+                match self.len {
+                    1 => hex::decode(format!("{:02}", len)).unwrap(),
+                    2 => hex::decode(format!("{:04}", len)).unwrap(),
+                    _ => panic!("Cannot support more than 2 bytes (4 BCD digits) of length indicator when expressed in bcd")
+                }
+            }
+
             _ => unimplemented!("only ascii supported for length encoding on var fields - {:?}", self.len_encoding)
         }
     }
@@ -240,7 +280,8 @@ impl Field for VarField
 
 
     fn children(&self) -> Vec<&dyn Field> {
-        unimplemented!("nested fields not supported for {}", self.name)
+        //unimplemented!("nested fields not supported for {}", self.name)
+        vec![]
     }
 
 
@@ -278,12 +319,14 @@ pub(in crate::iso8583) fn vec_to_string(encoding: &Encoding, data: &Vec<u8>) -> 
     }
 }
 
+/// Converts EBCDIC bytes into a ASCII string
 fn ebcdic_to_ascii(data: &Vec<u8>) -> String {
     let mut ascii_str = String::new();
     data.iter().for_each(|f| ascii_str.push(char::from(encoding8::ebcdic::to_ascii(f.clone()))));
     ascii_str
 }
 
+/// Converts ASCII bytes to EBCDIC bytes
 fn ascii_to_ebcdic(data: &mut Vec<u8>) -> Vec<u8> {
     for i in 0..data.len() {
         encoding8::ascii::make_ebcdic(data.get_mut(i).unwrap())

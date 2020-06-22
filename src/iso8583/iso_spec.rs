@@ -297,6 +297,7 @@ impl Display for IsoMsg {
                     pos_str = format!("[{:03}]", field.position());
                 }
 
+                //debug!("** formatting {}",field.name());
                 res = res + format!("\n{:20.40} {:4}: {} ", f, pos_str.as_str(), field.to_string(field_value)).as_str();
             }
         }
@@ -333,6 +334,11 @@ impl Spec {
             let res = match f.parse(&mut cp_data, &mut iso_msg.fd_map) {
                 Err(e) => Result::Err(e),
                 Ok(_) => {
+                    //if this is "THE" bitmap, then save it on isomsg
+                    if f.name() == "bitmap" {
+                        let bmp_data = iso_msg.fd_map.get(f.name()).unwrap();
+                        iso_msg.bmp = bitmap::from_vec(bmp_data);
+                    }
                     Ok(())
                 }
             };
