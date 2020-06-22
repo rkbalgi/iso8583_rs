@@ -117,7 +117,8 @@ mod tests {
 
         match reader.read_exact(&mut out_buf[..]) {
             Ok(()) => {
-                println!("received response:  {:?} with  {} bytes.", hex::encode(&out_buf), len);
+                println!("received response: with  {} bytes.", len);
+                hexdump::hexdump(&out_buf[..]);
                 match iso_spec::spec("SampleSpec").parse(&mut out_buf) {
                     Ok(resp_iso_msg) => {
                         println!("parsed iso-response \"{}\" \n {} \n", resp_iso_msg.msg.name(), resp_iso_msg);

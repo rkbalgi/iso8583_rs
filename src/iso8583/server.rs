@@ -7,6 +7,8 @@ use std::thread::JoinHandle;
 use crate::iso8583::{IsoError};
 use crate::iso8583::iso_spec::{IsoMsg, Spec};
 use crate::iso8583::mli::MLI;
+use hexdump::hexdump_iter;
+
 
 /// This struct represents an error associated with server errors
 pub struct IsoServerError {
@@ -90,11 +92,12 @@ fn new_client(iso_server: &IsoServer, stream_: TcpStream) {
                                 //reading data
                                 if mli > 0 && in_buf.len() >= mli as usize {
                                     let data = &in_buf[0..mli as usize];
-                                    debug!("received request len = {}  : data = {}", mli, hex::encode(data));
+
+                                    debug!("received request: \n{}\n len = {}", get_hexdump(&data.to_vec()), mli);
 
                                     match iso_server_clone.msg_processor.process(&iso_server_clone, &mut data.to_vec()) {
                                         Ok(resp) => {
-                                            debug!("iso_response \n raw:: {}, \n parsed:: \n {} \n ", hex::encode(&resp.0), resp.1);
+                                            debug!("iso_response : {} \n parsed :\n--- {} -- \n", get_hexdump(&resp.0), resp.1);
 
 
                                             match iso_server_clone.mli.create(&(resp.0).len()) {
@@ -150,7 +153,15 @@ pub fn new<'a>(host_port: String, mli: Box<dyn MLI>, msg_processor: Box<dyn MsgP
     }
 }
 
-
+fn get_hexdump(data: &Vec<u8>) -> String {
+    let mut hexdmp = String::new();
+    hexdmp.push_str("\n");
+    hexdump_iter(data).for_each(|f| {
+        hexdmp.push_str(f.as_ref());
+        hexdmp.push_str("\n");
+    });
+    hexdmp
+}
 
 
 

@@ -4,12 +4,11 @@ use crate::iso8583::iso_spec::IsoMsg;
 use std::fmt;
 use crate::iso8583::field::Encoding::{ASCII, EBCDIC, BCD, BINARY};
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, Write};
 
 use serde::{Serialize, Deserialize};
 use byteorder::ByteOrder;
 
-use log;
 
 /// This enum represents the encoding of a field (or length indicator for variable fields)
 #[derive(Serialize, Deserialize, Copy, Clone, Debug)]
@@ -219,8 +218,6 @@ impl VarField {
                     _ => panic!("Cannot support more than 2 bytes (4 BCD digits) of length indicator when expressed in bcd")
                 }
             }
-
-            _ => unimplemented!("only ascii supported for length encoding on var fields - {:?}", self.len_encoding)
         }
     }
 }

@@ -33,7 +33,6 @@ impl MsgProcessor for SampleMsgProcessor {
                     bmp: bitmap::new_bmp(0, 0, 0),
                 };
 
-
                 // process the incoming request based on amount
                 match iso_msg.bmp_child_value(4) {
                     Ok(amt) => {
@@ -54,6 +53,7 @@ impl MsgProcessor for SampleMsgProcessor {
                                     val.push_str(" - OK");
                                     iso_resp_msg.set_on(61, val.as_str()).unwrap_or_default();
                                 }
+                                
                                 if iso_msg.bmp.is_on(62) {
                                     let mut val = iso_msg.bmp_child_value(62).unwrap();
                                     val.push_str(" - OK");
