@@ -145,13 +145,11 @@ fn main() {
 
 ```
 
-###  Latest
-* Read spec definition from a YAML file
 
 ## Notes
 * A sample spec is defined in [sample_spec.yaml](sample_spec/sample_spec.yaml)
 * An ENV variable **SPEC_FILE** defines the location of the yaml spec definition file 
-* Supports ASCII,EBCDIC encoding is supported at this time (BINARY/BCD not yet supported for length indicator)
+* Supports ASCII,EBCDIC, BINARY/BCD encoding 
 
 ## Run ISO Server
 * Run main.rs to start the ISO server (backed by above spec)
