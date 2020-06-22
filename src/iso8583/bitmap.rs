@@ -1,11 +1,13 @@
+//! This module provides implementation of types for handling ISO bitmaps and Bitmapped fields
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead};
 
 use byteorder::ByteOrder;
 
 use crate::iso8583::field::{Encoding, Field, ParseError};
-use crate::iso8583::iso_spec;
+use crate::iso8583::{iso_spec, IsoError};
 
+/// This struct represents a bitmap that can support 192 (64*3) fields
 #[derive(Debug)]
 pub struct Bitmap {
     p_bmp: u64,
@@ -13,10 +15,11 @@ pub struct Bitmap {
     t_bmp: u64,
 }
 
+/// Operations on bitmap
 impl Bitmap {
+    /// Returns a boolean to indicate if the specified 'pos' is turned on in the bitmap
     pub fn is_on(&self, pos: u32) -> bool {
         assert!(pos > 0 && pos <= 192);
-        //println!("{:0x}{}", self.p_bmp >> 8, self.p_bmp >> ((64 as u32) - pos) as u64);
 
         if pos < 65 {
             self.p_bmp >> ((64 as u32) - pos) as u64 & 0x01 == 0x01
@@ -27,6 +30,7 @@ impl Bitmap {
         }
     }
 
+    /// Sets the position in bitmap
     pub fn set_on(&mut self, pos: u32) {
         assert!(pos > 0 && pos <= 192);
 
@@ -45,10 +49,12 @@ impl Bitmap {
         }
     }
 
+    /// Returns the bitmap as a hexadecimal string
     pub fn hex_string(&self) -> String {
         format!("{:016.0x}{:016.0x}{:016.0x}", self.p_bmp, self.s_bmp, self.t_bmp)
     }
 
+    /// Returns the bitmap as a Vec<u8>
     pub fn as_vec(&self) -> Vec<u8> {
         let mut bmp_data = vec![0; 8];
 
@@ -83,7 +89,7 @@ fn test_bmp() {
     }
 }
 
-
+/// Creates and returns a new Bitmap
 pub fn new_bmp(b1: u64, b2: u64, b3: u64) -> Bitmap {
     Bitmap {
         p_bmp: b1,
@@ -93,6 +99,27 @@ pub fn new_bmp(b1: u64, b2: u64, b3: u64) -> Bitmap {
 }
 
 
+pub fn from_vec(bmp_data: &Vec<u8>) -> Bitmap {
+    println!("{}", bmp_data.len());
+    assert!(bmp_data.len() >= 8 && bmp_data.len() <= 24);
+    let mut b1: u64 = 0;
+    let mut b2: u64 = 0;
+    let mut b3: u64 = 0;
+
+
+    if bmp_data.len() >= 8 {
+        b1 = byteorder::BigEndian::read_u64(&bmp_data[0..8]);
+    }
+    if bmp_data.len() >= 16 {
+        b2 = byteorder::BigEndian::read_u64(&bmp_data[8..16]);
+    }
+    if bmp_data.len() >= 24 {
+        b3 = byteorder::BigEndian::read_u64(&bmp_data[16..]);
+    }
+    new_bmp(b1, b2, b3)
+}
+
+/// This struct represents a bitmapped field in the ISO message
 pub struct BmpField {
     pub name: String,
     pub id: u32,
@@ -100,9 +127,10 @@ pub struct BmpField {
     pub children: Vec<Box<dyn Field>>,
 }
 
-
+/// Operarions on BmpField
 impl BmpField {
-    pub fn by_position(&self, pos: u32) -> Result<&Box<dyn Field>, ParseError> {
+    /// Returns a field at the position (if defined or a IsoError if not)
+    pub fn by_position(&self, pos: u32) -> Result<&Box<dyn Field>, IsoError> {
         let opt = &(self.children).iter().filter(|f| -> bool{
             if f.as_ref().position() == pos {
                 true
@@ -113,10 +141,11 @@ impl BmpField {
 
         match opt {
             Some(f) => Ok(f),
-            None => Err(ParseError { msg: format!("position {} not defined", pos) }),
+            None => Err(IsoError { msg: format!("position {} not defined", pos) }),
         }
     }
 }
+
 
 impl Field for BmpField {
     fn name(&self) -> &String {
@@ -176,13 +205,13 @@ impl Field for BmpField {
                             Ok(f) => {
                                 debug!("parsing field - {}", f.name());
                                 match f.parse(in_buf, f2d_map) {
-                                    Ok(r) => {
+                                    Ok(_) => {
                                         Ok(())
                                     }
                                     Err(e) => Err(e),
                                 }
                             }
-                            Err(e) => Err(e),
+                            Err(e) => Err(ParseError { msg: e.msg }),
                         }
                         {
                             Err(e) => {
@@ -214,13 +243,18 @@ impl Field for BmpField {
                 match self.by_position(pos) {
                     Ok(f) => {
                         match iso_msg.fd_map.get(f.name()) {
-                            Some(fd) => {
-                                f.assemble(out_buf, iso_msg);
+                            Some(_) => {
+                                match f.assemble(out_buf, iso_msg) {
+                                    Ok(_) => {}
+                                    Err(e) => {
+                                        return Err(ParseError { msg: format!("failed to assemble field {}, {}", f.name(), e.msg) });
+                                    }
+                                }
                             }
                             None => { return Err(ParseError { msg: format!("position {} is on, but no field data present!", pos) }); }
                         };
                     }
-                    Err(e) => return Err(e)
+                    Err(e) => return Err(ParseError { msg: e.msg })
                 }
             }
         };
@@ -261,7 +295,7 @@ impl Field for BmpField {
         hex::encode(data)
     }
 
-    fn to_raw(&self, val: &str) -> Vec<u8> {
+    fn to_raw(&self, _val: &str) -> Vec<u8> {
         unimplemented!()
     }
 }

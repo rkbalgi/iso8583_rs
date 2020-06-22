@@ -1,18 +1,16 @@
 extern crate byteorder;
 extern crate hex;
-#[macro_use]
 extern crate lazy_static;
 #[macro_use]
 extern crate log;
 extern crate simplelog;
 
 use std::collections::HashMap;
-use std::time::Duration;
 
 use iso8583_rs::iso8583::{bitmap, IsoError};
 use iso8583_rs::iso8583::iso_spec::IsoMsg;
-use iso8583_rs::iso8583::msg_processor::MsgProcessor;
 use iso8583_rs::iso8583::server::IsoServer;
+use iso8583_rs::iso8583::server::MsgProcessor;
 
 
 // Below is an example implementation of a MsgProcessor i.e the entity responsible for handling incoming messages
@@ -35,31 +33,43 @@ impl MsgProcessor for SampleMsgProcessor {
                     bmp: bitmap::new_bmp(0, 0, 0),
                 };
 
-
                 // process the incoming request based on amount
                 match iso_msg.bmp_child_value(4) {
                     Ok(amt) => {
-                        iso_resp_msg.set("message_type", "1110");
+                        iso_resp_msg.set("message_type", "1110").unwrap_or_default();
 
                         match amt.parse::<u32>() {
                             Ok(i_amt) => {
                                 debug!("amount = {}", i_amt);
                                 if i_amt < 100 {
-                                    iso_resp_msg.set_on(38, "APPR01");
-                                    iso_resp_msg.set_on(39, "000");
+                                    iso_resp_msg.set_on(38, "APPR01").unwrap_or_default();
+                                    iso_resp_msg.set_on(39, "000").unwrap_or_default();
                                 } else {
-                                    iso_resp_msg.set_on(39, "100");
+                                    iso_resp_msg.set_on(39, "100").unwrap_or_default();
                                 }
-                                iso_resp_msg.set_on(63, "007");
+
+                                if iso_msg.bmp.is_on(61) {
+                                    let mut val = iso_msg.bmp_child_value(61).unwrap();
+                                    val.push_str(" - OK");
+                                    iso_resp_msg.set_on(61, val.as_str()).unwrap_or_default();
+                                }
+                                
+                                if iso_msg.bmp.is_on(62) {
+                                    let mut val = iso_msg.bmp_child_value(62).unwrap();
+                                    val.push_str(" - OK");
+                                    iso_resp_msg.set_on(62, val.as_str()).unwrap_or_default();
+                                }
+
+                                iso_resp_msg.set_on(63, "007").unwrap_or_default();
                             }
-                            Err(e) => {
-                                iso_resp_msg.set_on(39, "107");
+                            Err(_e) => {
+                                iso_resp_msg.set_on(39, "107").unwrap_or_default();
                             }
                         };
 
                         match iso_resp_msg.echo_from(&iso_msg, &[2, 3, 4, 11, 14, 19, 96]) {
                             Err(e) => {
-                                error!("failed to echo fields into response. error = {}", "!");
+                                error!("failed to echo fields into response. error = {:?}", e);
                             }
                             _ => {}
                         };
@@ -67,11 +77,12 @@ impl MsgProcessor for SampleMsgProcessor {
                         iso_resp_msg.fd_map.insert("bitmap".to_string(), iso_resp_msg.bmp.as_vec());
                     }
                     Err(e) => {
-                        iso_resp_msg.set("message_type", "1110");
-                        iso_resp_msg.set_on(39, "115");
+                        error!("No amount in request, responding with 115. error = {}", e.msg);
+                        iso_resp_msg.set("message_type", "1110").unwrap_or_default();
+                        iso_resp_msg.set_on(39, "115").unwrap_or_default();
                         match iso_resp_msg.echo_from(&iso_msg, &[2, 3, 4, 11, 14, 19, 96]) {
                             Err(e) => {
-                                error!("failed to echo fields into response. error = {}", "!");
+                                error!("failed to echo fields into response. error = {}", e.msg);
                             }
                             _ => {}
                         };
@@ -101,15 +112,18 @@ fn main() {
     let iso_spec = iso8583_rs::iso8583::iso_spec::spec("");
 
     info!("starting iso server for spec {} at port {}", iso_spec.name(), 6666);
-    let server: IsoServer = match iso8583_rs::iso8583::server::new("localhost:6666".to_string(), Box::new(SampleMsgProcessor {}), iso_spec) {
+    let server: IsoServer = match iso8583_rs::iso8583::server::new("localhost:6666".to_string(),
+                                                                   Box::new(iso8583_rs::iso8583::mli::MLI2E {}),
+                                                                   Box::new(SampleMsgProcessor {}), iso_spec) {
         Ok(server) => {
             server
         }
         Err(e) => {
+            error!("failed to start ISO server - {}", e.msg);
             panic!(e)
         }
     };
-    server.start().join();
+    server.start().join().unwrap()
 }
 
 

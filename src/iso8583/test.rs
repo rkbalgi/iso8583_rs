@@ -33,7 +33,11 @@ mod tests {
         bmp.set_on(14);
         bmp.set_on(19);
         bmp.set_on(52);
+
+        bmp.set_on(61);
+        bmp.set_on(62);
         bmp.set_on(63);
+
         bmp.set_on(96);
         bmp.set_on(160);
 
@@ -64,10 +68,23 @@ mod tests {
             hex::decode("0102030405060708").unwrap().as_slice().read_to_end(&mut raw_msg);
         }
 
+        //61 llvar with bcd (2) + ASCII
+        if bmp.is_on(61) {
+            // 11 bytes
+            hex::decode("0011").unwrap().as_slice().read_to_end(&mut raw_msg);
+            "Raghavendra".as_bytes().read_to_end(&mut raw_msg);
+        }
+
+        //62 llvar with binary (1) + EBCDIC
+        if bmp.is_on(62) {
+            // 17 bytes
+            hex::decode("11").unwrap().as_slice().read_to_end(&mut raw_msg);
+            crate::iso8583::field::string_to_vec(&EBCDIC, "Raghavendra Balgi").as_slice().read_to_end(&mut raw_msg);
+        }
+
         if bmp.is_on(63) {
             crate::iso8583::field::string_to_vec(&EBCDIC, "011").as_slice().read_to_end(&mut raw_msg);
             "87877622525".as_bytes().read_to_end(&mut raw_msg);
-
         }
 
         //bit 96
@@ -100,7 +117,8 @@ mod tests {
 
         match reader.read_exact(&mut out_buf[..]) {
             Ok(()) => {
-                println!("received response:  {:?} with  {} bytes.", hex::encode(&out_buf), len);
+                println!("received response: with  {} bytes.", len);
+                hexdump::hexdump(&out_buf[..]);
                 match iso_spec::spec("SampleSpec").parse(&mut out_buf) {
                     Ok(resp_iso_msg) => {
                         println!("parsed iso-response \"{}\" \n {} \n", resp_iso_msg.msg.name(), resp_iso_msg);

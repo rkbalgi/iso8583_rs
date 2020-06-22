@@ -1,4 +1,4 @@
-use std::convert::TryInto;
+//! This module contains implementation of spec deserialization logic from a YAML file
 use std::io::Read;
 
 use serde::{Deserialize, Serialize};
@@ -45,7 +45,7 @@ impl Into<Box<dyn Field>> for &YField {
             "Bitmapped" => {
                 let mut children: Vec<Box<dyn Field>> = Vec::<Box<dyn Field>>::new();
                 if self.children.is_some() {
-                    let ychildren=&self.children.as_ref().unwrap();
+                    let ychildren = &self.children.as_ref().unwrap();
                     &ychildren.iter().for_each(|f| {
                         children.push(Into::<Box<dyn Field>>::into(f));
                     });
@@ -111,30 +111,11 @@ pub struct YMessageSegment {
 }
 
 
-/*impl Into<MessageSegment> for YMessageSegment {
-    fn into(self) -> MessageSegment {
-        let mut fields: Vec<Box<dyn Field>> = vec![];
-        if self.fields.is_some() {
-            self.fields.iter().for_each(|f| {
-                fields.push(Box::new(f.into()));
-            })
-        }
-
-        MessageSegment {
-            name: self.name.as_str(),
-            id: self.id,
-            selector: self.selector.iter().map(|s| s.as_str()).collect(),
-            fields,
-        }
-    }
-}*/
-
-
 pub fn read_spec(spec_file: &str) -> Result<Spec, IsoError> {
     match std::fs::File::open(spec_file) {
         Ok(f) => {
             let mut yaml_str = String::new();
-            (&f).read_to_string(&mut yaml_str);
+            let _ = (&f).read_to_string(&mut yaml_str);
 
             match serde_yaml::from_str::<YSpec>(&yaml_str) {
                 Ok(y_spec) => {
