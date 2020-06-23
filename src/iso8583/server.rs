@@ -34,7 +34,7 @@ pub trait MsgProcessor: Send + Sync {
 impl IsoServer {
     /// Starts the server in a separate thread
     pub fn start(&self) -> JoinHandle<()> {
-        let iso_server_clone = IsoServer {
+        let server = IsoServer {
             sock_addr: self.sock_addr.clone(),
             spec: self.spec,
             mli: self.mli.clone(),
@@ -42,12 +42,12 @@ impl IsoServer {
         };
 
         std::thread::spawn(move || {
-            let listener = std::net::TcpListener::bind(iso_server_clone.sock_addr).unwrap();
+            let listener = std::net::TcpListener::bind(server.sock_addr).unwrap();
 
             for stream in listener.incoming() {
                 let client = stream.unwrap();
                 debug!("Accepted new connection .. {:?}", &client.peer_addr());
-                new_client(&iso_server_clone, client);
+                new_client(&server, client);
             }
         })
     }
@@ -55,7 +55,7 @@ impl IsoServer {
 
 /// Runs a new thread to handle a new incoming connection
 fn new_client(iso_server: &IsoServer, stream_: TcpStream) {
-    let iso_server_clone = IsoServer {
+    let server = IsoServer {
         sock_addr: iso_server.sock_addr.clone(),
         spec: iso_server.spec,
         mli: iso_server.mli.clone(),
@@ -64,9 +64,7 @@ fn new_client(iso_server: &IsoServer, stream_: TcpStream) {
 
     std::thread::spawn(move || {
         let mut buf: [u8; 512] = [0; 512];
-
         let mut stream = stream_;
-
         let mut reading_mli = true;
         let mut in_buf: Vec<u8> = Vec::with_capacity(512);
         let mut mli: u32 = 0;
@@ -81,7 +79,7 @@ fn new_client(iso_server: &IsoServer, stream_: TcpStream) {
 
                         while in_buf.len() > 0 {
                             if reading_mli {
-                                match iso_server_clone.mli.parse(&mut in_buf) {
+                                match server.mli.parse(&mut in_buf) {
                                     Ok(n) => {
                                         mli = n;
                                         reading_mli = false;
@@ -94,14 +92,14 @@ fn new_client(iso_server: &IsoServer, stream_: TcpStream) {
                                     let data = &in_buf[0..mli as usize];
 
                                     debug!("received request: \n{}\n len = {}", get_hexdump(&data.to_vec()), mli);
+                                    let t1 = std::time::Instant::now();
 
-                                    match iso_server_clone.msg_processor.process(&iso_server_clone, &mut data.to_vec()) {
+                                    match server.msg_processor.process(&server, &mut data.to_vec()) {
                                         Ok(resp) => {
                                             debug!("iso_response : {} \n parsed :\n--- {} -- \n", get_hexdump(&resp.0), resp.1);
-
-
-                                            match iso_server_clone.mli.create(&(resp.0).len()) {
+                                            match server.mli.create(&(resp.0).len()) {
                                                 Ok(mut resp_data) => {
+                                                    debug!("request processing time = {} millis", std::time::Instant::now().duration_since(t1).as_millis());
                                                     (&mut resp_data).write_all(resp.0.as_slice()).unwrap();
                                                     stream.write_all(resp_data.as_slice()).unwrap();
                                                 }

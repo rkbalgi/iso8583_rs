@@ -7,8 +7,6 @@ description = "A library to define/parse/assemble and deliver (via TCP) an ISO85
 license = "Apache-2.0"
 publish = true
 repository = "https://github.com/rkbalgi/iso8583_rs"
-documentation = "https://github.com/rkbalgi/iso8583_rs"
-
 readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
