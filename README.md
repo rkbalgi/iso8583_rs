@@ -3,7 +3,8 @@ ISO8583 library written in Rust
 
 ![Crates.io](https://img.shields.io/crates/d/iso8583_rs?style=flat-square)
 
-* Define and start a ISO8583 server
+* Define a new specification in a YAML file
+* Define and start a ISO8583 server baseed on the spec
 * Define a message-processor that can "act" on an incoming message and generate a response
 * Use a TCP client to invoke the ISO server
 
