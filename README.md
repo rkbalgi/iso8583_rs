@@ -20,10 +20,8 @@ extern crate lazy_static;
 extern crate log;
 extern crate simplelog;
 
-use std::collections::HashMap;
-
-use iso8583_rs::iso8583::{bitmap, IsoError};
-use iso8583_rs::iso8583::iso_spec::IsoMsg;
+use iso8583_rs::iso8583::IsoError;
+use iso8583_rs::iso8583::iso_spec::{IsoMsg, new_msg};
 use iso8583_rs::iso8583::server::IsoServer;
 use iso8583_rs::iso8583::server::MsgProcessor;
 
@@ -51,12 +49,7 @@ impl MsgProcessor for SampleMsgProcessor {
                 };
 
 
-                let mut iso_resp_msg = IsoMsg {
-                    spec: &iso_msg.spec,
-                    msg: &iso_msg.spec.get_message_from_header(resp_msg_type).unwrap(),
-                    fd_map: HashMap::new(),
-                    bmp: bitmap::new_bmp(0, 0, 0),
-                };
+                let mut iso_resp_msg = new_msg(&iso_msg.spec, &iso_msg.spec.get_message_from_header(resp_msg_type).unwrap());
 
                 if req_msg_type == "1420" {
                     iso_resp_msg.set("message_type", resp_msg_type).unwrap_or_default();
@@ -156,6 +149,8 @@ fn main() {
     };
     server.start().join().unwrap()
 }
+
+
 
 
 
