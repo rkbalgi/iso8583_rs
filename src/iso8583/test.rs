@@ -7,99 +7,90 @@ mod tests {
     use byteorder::{ReadBytesExt};
     use byteorder::ByteOrder;
 
-    use crate::iso8583::iso_spec;
+    use crate::iso8583::{iso_spec, IsoError};
     use crate::iso8583::server::IsoServer;
     use crate::iso8583::field::Encoding::EBCDIC;
+    use crate::iso8583::iso_spec::IsoMsg;
+    use std::collections::HashMap;
+    use crate::iso8583::mli::{MLI, MLI2E};
+    use std::process::exit;
 
 
     #[test]
-    fn test_send_recv_iso() -> Result<(), Error> {
+    fn test_send_recv_iso_1100() -> Result<(), Error> {
         std::env::set_var("SPEC_FILE", "sample_spec/sample_spec.yaml");
 
-        let mut raw_msg: Vec<u8> = Vec::new();
+        let spec = crate::iso8583::iso_spec::spec("");
+        let msg_seg = spec.get_message_from_header("1100").unwrap();
 
-        //make space for mli (swapped later)
-        raw_msg.push(0);
-        raw_msg.push(0);
+        let mut iso_msg = iso_spec::new_msg(spec,msg_seg);
 
-        // message type
-        "1100".as_bytes().read_to_end(&mut raw_msg);
-
-        let mut bmp = crate::iso8583::bitmap::new_bmp(0, 0, 0);
-        bmp.set_on(2);
-        bmp.set_on(3);
-        bmp.set_on(4);
-        bmp.set_on(11);
-        bmp.set_on(14);
-        bmp.set_on(19);
-        bmp.set_on(52);
-
-        bmp.set_on(61);
-        bmp.set_on(62);
-        bmp.set_on(63);
-
-        bmp.set_on(96);
-        bmp.set_on(160);
-
-        //bitmap
-        raw_msg.write_all(hex::decode(bmp.hex_string()).expect("failed to decode bmp").as_slice());
-
-        //pan - with length indicator and data
-        "12".as_bytes().read_to_end(&mut raw_msg);
-        "123456789101".as_bytes().read_to_end(&mut raw_msg);
-
-        //proc code
-        "004000".as_bytes().read_to_end(&mut raw_msg);
-
-        //amount
-        "000000000199".as_bytes().read_to_end(&mut raw_msg);
-
-        //stan
-        "779581".as_bytes().read_to_end(&mut raw_msg);
-
-        //expiration date
-        "2204".as_bytes().read_to_end(&mut raw_msg);
-
-        //country_code (ebcdic field)
-        crate::iso8583::field::string_to_vec(&EBCDIC, "840").as_slice().read_to_end(&mut raw_msg);
+        &iso_msg.set("message_type", "1100").unwrap();
+        &iso_msg.set_on(2, "123456789101").unwrap();
+        &iso_msg.set_on(3, "004000").unwrap();
+        &iso_msg.set_on(4, "000000000199").unwrap();
+        &iso_msg.set_on(11, "779581").unwrap();
+        &iso_msg.set_on(14, "2204").unwrap();
+        &iso_msg.set_on(19, "840").unwrap();
+        &iso_msg.set_on(52, "0102030405060708").unwrap();
+        &iso_msg.set_on(61, "Raghavendra").unwrap();
+        &iso_msg.set_on(62, "Raghavendra Balgi").unwrap();
+        &iso_msg.set_on(63, "87877622525").unwrap();
+        &iso_msg.set_on(96, "1234").unwrap();
+        &iso_msg.set_on(160, "5678").unwrap();
 
 
-        if bmp.is_on(52) {
-            hex::decode("0102030405060708").unwrap().as_slice().read_to_end(&mut raw_msg);
+        match iso_msg.assemble() {
+            Ok(data) => {
+                let mli = &crate::iso8583::mli::MLI2E {};
+                let mut buf = mli.create(&data.len()).unwrap();
+                buf.extend(data);
+                send_recv(&buf)
+            }
+            Err(e) => {
+                println!("Failed to assemble request message: {}", e.msg);
+                Ok(())
+            }
         }
+    }
 
-        //61 llvar with bcd (2) + ASCII
-        if bmp.is_on(61) {
-            // 11 bytes
-            hex::decode("0011").unwrap().as_slice().read_to_end(&mut raw_msg);
-            "Raghavendra".as_bytes().read_to_end(&mut raw_msg);
+
+    #[test]
+    fn test_send_recv_iso_1420() -> Result<(), Error> {
+        std::env::set_var("SPEC_FILE", "sample_spec/sample_spec.yaml");
+
+        let spec = crate::iso8583::iso_spec::spec("");
+        let msg_seg = spec.get_message_from_header("1420").unwrap();
+
+        let mut iso_msg = iso_spec::new_msg(spec,msg_seg);
+
+        &iso_msg.set("message_type", "1420").unwrap();
+        &iso_msg.set_on(2, "123456789101").unwrap();
+        &iso_msg.set_on(3, "004000").unwrap();
+        &iso_msg.set_on(4, "000000000199").unwrap();
+        &iso_msg.set_on(11, "779581").unwrap();
+        &iso_msg.set_on(14, "2204").unwrap();
+        &iso_msg.set_on(19, "840").unwrap();
+        &iso_msg.set_on(96, "1234").unwrap();
+        &iso_msg.set_on(160, "5678").unwrap();
+
+
+        match iso_msg.assemble() {
+            Ok(data) => {
+                let mli = &crate::iso8583::mli::MLI2E {};
+                let mut buf = mli.create(&data.len()).unwrap();
+                buf.extend(data);
+                send_recv(&buf)
+            }
+            Err(e) => {
+                println!("Failed to assemble request message: {}", e.msg);
+                Ok(())
+            }
         }
-
-        //62 llvar with binary (1) + EBCDIC
-        if bmp.is_on(62) {
-            // 17 bytes
-            hex::decode("11").unwrap().as_slice().read_to_end(&mut raw_msg);
-            crate::iso8583::field::string_to_vec(&EBCDIC, "Raghavendra Balgi").as_slice().read_to_end(&mut raw_msg);
-        }
-
-        if bmp.is_on(63) {
-            crate::iso8583::field::string_to_vec(&EBCDIC, "011").as_slice().read_to_end(&mut raw_msg);
-            "87877622525".as_bytes().read_to_end(&mut raw_msg);
-        }
-
-        //bit 96
-        "1234".as_bytes().read_to_end(&mut raw_msg);
-
-        //bit 160
-        "8888".as_bytes().read_to_end(&mut raw_msg);
+    }
 
 
-        let mut mli: [u8; 2] = [0; 2];
-        byteorder::BigEndian::write_u16(&mut mli[..], raw_msg.len() as u16 - 2);
-
-        std::mem::swap(&mut mli[0], &mut raw_msg[0]);
-        std::mem::swap(&mut mli[1], &mut raw_msg[1]);
-
+    fn send_recv(raw_msg: &Vec<u8>) -> Result<(), Error> {
         println!("raw iso msg = {}", hex::encode(raw_msg.as_slice()));
 
         let mut client = TcpStream::connect("localhost:6666")?;
@@ -133,3 +124,4 @@ mod tests {
         Ok(())
     }
 }
+

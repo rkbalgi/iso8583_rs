@@ -41,68 +41,31 @@ impl MsgProcessor for SampleMsgProcessor {
                 debug!("parsed incoming request - message = \"{}\" successfully. \n : parsed message: \n --- \n {} \n ----\n",
                        iso_msg.msg.name(), iso_msg);
 
+                let req_msg_type = iso_msg.get_field_value(&"message_type".to_string()).unwrap();
+                let resp_msg_type = if req_msg_type == "1100" {
+                    "1110"
+                } else if req_msg_type == "1420" {
+                    "1430"
+                } else {
+                    return Err(IsoError { msg: format!("unsupported msg_type {}", req_msg_type) });
+                };
+
+
                 let mut iso_resp_msg = IsoMsg {
                     spec: &iso_msg.spec,
-                    msg: &iso_msg.spec.get_message_from_header("1110").unwrap(),
+                    msg: &iso_msg.spec.get_message_from_header(resp_msg_type).unwrap(),
                     fd_map: HashMap::new(),
                     bmp: bitmap::new_bmp(0, 0, 0),
                 };
 
-                // process the incoming request based on amount
-                match iso_msg.bmp_child_value(4) {
-                    Ok(amt) => {
-                        iso_resp_msg.set("message_type", "1110").unwrap_or_default();
-
-                        match amt.parse::<u32>() {
-                            Ok(i_amt) => {
-                                debug!("amount = {}", i_amt);
-                                if i_amt < 100 {
-                                    iso_resp_msg.set_on(38, "APPR01").unwrap_or_default();
-                                    iso_resp_msg.set_on(39, "000").unwrap_or_default();
-                                } else {
-                                    iso_resp_msg.set_on(39, "100").unwrap_or_default();
-                                }
-
-                                if iso_msg.bmp.is_on(61) {
-                                    let mut val = iso_msg.bmp_child_value(61).unwrap();
-                                    val.push_str(" - OK");
-                                    iso_resp_msg.set_on(61, val.as_str()).unwrap_or_default();
-                                }
-                                
-                                if iso_msg.bmp.is_on(62) {
-                                    let mut val = iso_msg.bmp_child_value(62).unwrap();
-                                    val.push_str(" - OK");
-                                    iso_resp_msg.set_on(62, val.as_str()).unwrap_or_default();
-                                }
-
-                                iso_resp_msg.set_on(63, "007").unwrap_or_default();
-                            }
-                            Err(_e) => {
-                                iso_resp_msg.set_on(39, "107").unwrap_or_default();
-                            }
-                        };
-
-                        match iso_resp_msg.echo_from(&iso_msg, &[2, 3, 4, 11, 14, 19, 96]) {
-                            Err(e) => {
-                                error!("failed to echo fields into response. error = {:?}", e);
-                            }
-                            _ => {}
-                        };
-
-                        iso_resp_msg.fd_map.insert("bitmap".to_string(), iso_resp_msg.bmp.as_vec());
-                    }
-                    Err(e) => {
-                        error!("No amount in request, responding with 115. error = {}", e.msg);
-                        iso_resp_msg.set("message_type", "1110").unwrap_or_default();
-                        iso_resp_msg.set_on(39, "115").unwrap_or_default();
-                        match iso_resp_msg.echo_from(&iso_msg, &[2, 3, 4, 11, 14, 19, 96]) {
-                            Err(e) => {
-                                error!("failed to echo fields into response. error = {}", e.msg);
-                            }
-                            _ => {}
-                        };
-                    }
+                if req_msg_type == "1420" {
+                    iso_resp_msg.set("message_type", resp_msg_type).unwrap_or_default();
+                    iso_resp_msg.echo_from(&iso_msg, &[2, 3, 4, 11, 14, 19, 96])?;
+                    iso_resp_msg.set_on(39, "400").unwrap_or_default();
+                } else if req_msg_type == "1100" {
+                    handle_1100(&iso_msg, &mut iso_resp_msg)?
                 }
+
 
                 match iso_resp_msg.assemble() {
                     Ok(resp_data) => Ok((resp_data, iso_resp_msg)),
@@ -118,6 +81,59 @@ impl MsgProcessor for SampleMsgProcessor {
         }
     }
 }
+
+
+// Handle the incoming 1100 message based on amount
+fn handle_1100(iso_msg: &IsoMsg, iso_resp_msg: &mut IsoMsg) -> Result<(), IsoError> {
+
+    // process the incoming request based on amount
+    match iso_msg.bmp_child_value(4) {
+        Ok(amt) => {
+            iso_resp_msg.set("message_type", "1110").unwrap_or_default();
+
+            match amt.parse::<u32>() {
+                Ok(i_amt) => {
+                    debug!("amount = {}", i_amt);
+                    if i_amt < 100 {
+                        iso_resp_msg.set_on(38, "APPR01").unwrap_or_default();
+                        iso_resp_msg.set_on(39, "000").unwrap_or_default();
+                    } else {
+                        iso_resp_msg.set_on(39, "100").unwrap_or_default();
+                    }
+
+                    if iso_msg.bmp.is_on(61) {
+                        let mut val = iso_msg.bmp_child_value(61).unwrap();
+                        val.push_str(" - OK");
+                        iso_resp_msg.set_on(61, val.as_str()).unwrap_or_default();
+                    }
+
+                    if iso_msg.bmp.is_on(62) {
+                        let mut val = iso_msg.bmp_child_value(62).unwrap();
+                        val.push_str(" - OK");
+                        iso_resp_msg.set_on(62, val.as_str()).unwrap_or_default();
+                    }
+
+                    iso_resp_msg.set_on(63, "007").unwrap_or_default();
+                }
+                Err(_e) => {
+                    iso_resp_msg.set_on(39, "107").unwrap_or_default();
+                }
+            };
+
+            iso_resp_msg.echo_from(&iso_msg, &[2, 3, 4, 11, 14, 19, 96])?;
+            iso_resp_msg.fd_map.insert("bitmap".to_string(), iso_resp_msg.bmp.as_vec());
+
+            Ok(())
+        }
+        Err(e) => {
+            error!("No amount in request, responding with 115. error = {}", e.msg);
+            iso_resp_msg.set("message_type", "1110").unwrap_or_default();
+            iso_resp_msg.set_on(39, "115").unwrap_or_default();
+            iso_resp_msg.echo_from(&iso_msg, &[2, 3, 4, 11, 14, 19, 96])
+        }
+    }
+}
+
 
 fn main() {
     std::env::set_var("SPEC_FILE", "sample_spec\\sample_spec.yaml");
@@ -140,6 +156,7 @@ fn main() {
     };
     server.start().join().unwrap()
 }
+
 
 
 

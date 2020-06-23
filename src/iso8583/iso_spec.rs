@@ -312,6 +312,16 @@ pub fn spec(_name: &str) -> &'static Spec {
     ALL_SPECS.iter().find_map(|(_k, v)| Some(v)).unwrap()
 }
 
+/// Returns a empty IsoMsg that can be used to create a message
+pub fn new_msg(spec: &'static Spec, seg: &'static MessageSegment) -> IsoMsg {
+    IsoMsg {
+        spec,
+        msg: seg,
+        fd_map: HashMap::new(),
+        bmp: crate::iso8583::bitmap::new_bmp(0, 0, 0),
+    }
+}
+
 impl Spec {
     /// Returns a IsoMsg after parsing data or an ParseError on failure
     pub fn parse(&'static self, data: &mut Vec<u8>) -> Result<IsoMsg, ParseError> {
