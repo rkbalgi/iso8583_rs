@@ -23,7 +23,7 @@ mod tests {
         let spec = crate::iso8583::iso_spec::spec("");
         let msg_seg = spec.get_message_from_header("1100").unwrap();
 
-        let mut iso_msg = iso_spec::new_msg(spec,msg_seg);
+        let mut iso_msg = iso_spec::new_msg(spec, msg_seg);
 
         &iso_msg.set("message_type", "1100").unwrap();
         &iso_msg.set_on(2, "123456789101").unwrap();
@@ -62,7 +62,7 @@ mod tests {
         let spec = crate::iso8583::iso_spec::spec("");
         let msg_seg = spec.get_message_from_header("1420").unwrap();
 
-        let mut iso_msg = iso_spec::new_msg(spec,msg_seg);
+        let mut iso_msg = iso_spec::new_msg(spec, msg_seg);
 
         &iso_msg.set("message_type", "1420").unwrap();
         &iso_msg.set_on(2, "123456789101").unwrap();
@@ -94,6 +94,7 @@ mod tests {
         println!("raw iso msg = {}", hex::encode(raw_msg.as_slice()));
 
         let mut client = TcpStream::connect("localhost:6666")?;
+        println!("connected to server @ {:?}", client.local_addr());
 
         client.write_all(raw_msg.as_slice())?;
         client.flush();
