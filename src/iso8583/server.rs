@@ -18,7 +18,7 @@ pub struct IsoServerError {
 /// This struct represents a IsoServer
 pub struct IsoServer {
     /// The listen address for this server
-    sock_addr: SocketAddr,
+    sock_addr: Vec<SocketAddr>,
     pub(crate) mli: Arc<Box<dyn MLI>>,
     /// The specification associated with the server
     pub spec: &'static crate::iso8583::iso_spec::Spec,
@@ -42,7 +42,7 @@ impl IsoServer {
         };
 
         std::thread::spawn(move || {
-            let listener = std::net::TcpListener::bind(server.sock_addr).unwrap();
+            let listener = std::net::TcpListener::bind(server.sock_addr.as_slice()).unwrap();
 
             for stream in listener.incoming() {
                 let client = stream.unwrap();
@@ -137,14 +137,15 @@ fn new_client(iso_server: &IsoServer, stream_: TcpStream) {
 /// Returns a new ISO server on success or a IsoServer if the provided addr is incorrect
 pub fn new<'a>(host_port: String, mli: Box<dyn MLI>, msg_processor: Box<dyn MsgProcessor>, spec: &'static Spec) -> Result<IsoServer, IsoServerError> {
     match host_port.to_socket_addrs() {
-        Ok(mut i) => {
-            match i.next() {
-                Some(ip_addr) => {
-                    Ok(IsoServer { sock_addr: ip_addr, spec, mli: Arc::new(mli), msg_processor: Arc::new(msg_processor) })
-                }
-                None => {
-                    Err(IsoServerError { msg: format!("invalid host_port: {} : unresolvable?", &host_port) })
-                }
+        Ok(addrs) => {
+            let addrs = addrs.as_slice();
+            //use only ipv4 for now
+            let addrs = addrs.iter().filter(|s| s.is_ipv4()).map(|s| *s).collect::<Vec<SocketAddr>>();
+
+            if addrs.len() > 0 {
+                Ok(IsoServer { sock_addr: addrs, spec, mli: Arc::new(mli), msg_processor: Arc::new(msg_processor) })
+            } else {
+                Err(IsoServerError { msg: format!("invalid host_port: {} : unresolvable?", &host_port) })
             }
         }
         Err(e) => Err(IsoServerError { msg: format!("invalid host_port: {}: cause: {}", &host_port, e.to_string()) })
