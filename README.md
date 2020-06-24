@@ -11,7 +11,7 @@ ISO8583 library written in Rust
 * An ENV variable **SPEC_FILE** defines the location of the yaml spec definition file 
 * Supports ASCII, EBCDIC, BINARY/BCD encoding
 
-# Summary of Operation
+## Notes
 
 Each spec defines a set of header fields (typically the MTI or Message Type), followed by any number
 of messages (auth/reversal etc). 
@@ -31,7 +31,7 @@ extern crate lazy_static;
 extern crate log;
 extern crate simplelog;
 
-use iso8583_rs::iso8583::IsoError;
+use iso8583_rs::iso8583::{IsoError, server};
 use iso8583_rs::iso8583::iso_spec::{IsoMsg, new_msg};
 use iso8583_rs::iso8583::server::IsoServer;
 use iso8583_rs::iso8583::server::MsgProcessor;
@@ -147,9 +147,9 @@ fn main() {
     let iso_spec = iso8583_rs::iso8583::iso_spec::spec("");
 
     info!("starting iso server for spec {} at port {}", iso_spec.name(), 6666);
-    let server: IsoServer = match iso8583_rs::iso8583::server::new("localhost:6666".to_string(),
-                                                                   Box::new(iso8583_rs::iso8583::mli::MLI2E {}),
-                                                                   Box::new(SampleMsgProcessor {}), iso_spec) {
+    let server: IsoServer = match server::new("127.0.0.1:6666".to_string(),
+                                              Box::new(iso8583_rs::iso8583::mli::MLI2E {}),
+                                              Box::new(SampleMsgProcessor {}), iso_spec) {
         Ok(server) => {
             server
         }
@@ -160,6 +160,7 @@ fn main() {
     };
     server.start().join().unwrap()
 }
+
 
 ```
 
