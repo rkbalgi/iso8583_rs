@@ -7,8 +7,18 @@ ISO8583 library written in Rust
 * Define and start a ISO8583 server baseed on the spec
 * Define a message-processor that can "act" on an incoming message and generate a response
 * Use a TCP client to invoke the ISO server
+* A sample spec is defined in [sample_spec.yaml](sample_spec/sample_spec.yaml)
+* An ENV variable **SPEC_FILE** defines the location of the yaml spec definition file 
+* Supports ASCII, EBCDIC, BINARY/BCD encoding
 
-(This project is mostly WIP) 
+# Summary of Operation
+
+Each spec defines a set of header fields (typically the MTI or Message Type), followed by any number
+of messages (auth/reversal etc). 
+For each incoming request (buffer), the header fields are parsed. The value of the parsed header field is matched against the selector
+defined on the message. On successful match, the incoming data is parsed against the message. Once parsed,
+the message is fed into the MsgProcessor defined on the server. The MsgProcessor applies its logic and generates a 
+response which is sent back to the client.   
 
 
 ## Usage: 
@@ -151,18 +161,46 @@ fn main() {
     server.start().join().unwrap()
 }
 
-
-
-
-
-
 ```
 
+## Sample TCP client
 
-## Notes
-* A sample spec is defined in [sample_spec.yaml](sample_spec/sample_spec.yaml)
-* An ENV variable **SPEC_FILE** defines the location of the yaml spec definition file 
-* Supports ASCII,EBCDIC, BINARY/BCD encoding 
+```rust
+
+fn send_reversal() -> Result<(), Error> {
+        std::env::set_var("SPEC_FILE", "sample_spec/sample_spec.yaml");
+
+        let spec = crate::iso8583::iso_spec::spec("");
+        let msg_seg = spec.get_message_from_header("1420").unwrap();
+
+        let mut iso_msg = iso_spec::new_msg(spec, msg_seg);
+
+        &iso_msg.set("message_type", "1420").unwrap();
+        &iso_msg.set_on(2, "123456789101").unwrap();
+        &iso_msg.set_on(3, "004000").unwrap();
+        &iso_msg.set_on(4, "000000000199").unwrap();
+        &iso_msg.set_on(11, "779581").unwrap();
+        &iso_msg.set_on(14, "2204").unwrap();
+        &iso_msg.set_on(19, "840").unwrap();
+        &iso_msg.set_on(96, "1234").unwrap();
+        &iso_msg.set_on(160, "5678").unwrap();
+
+
+        match iso_msg.assemble() {
+            Ok(data) => {
+                let mli = &crate::iso8583::mli::MLI2E {};
+                let mut buf = mli.create(&data.len()).unwrap();
+                buf.extend(data);
+                send_recv(&buf)
+            }
+            Err(e) => {
+                println!("Failed to assemble request message: {}", e.msg);
+                Ok(())
+            }
+        }
+    }
+
+```
 
 ## Run ISO Server
 * Run main.rs to start the ISO server (backed by above spec)
