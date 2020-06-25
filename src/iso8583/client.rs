@@ -3,17 +3,17 @@
 use crate::iso8583::iso_spec::{Spec, IsoMsg};
 use crate::iso8583::IsoError;
 use std::net::TcpStream;
-use crate::iso8583::mli::{MLI, MLIType};
+use crate::iso8583::mli::{MLI, MLIType, MLI2E, MLI2I, MLI4E, MLI4I};
 use std::io::{Write, BufReader, Read};
 use byteorder::ReadBytesExt;
 use crate::iso8583::server::get_hexdump;
-
+use std::borrow::BorrowMut;
 
 
 /// This struct represents a ISO8583 TCP client
 pub struct ISOTcpClient {
     server_addr: String,
-    mli_type: MLIType,
+    mli: Box<dyn MLI>,
     spec: &'static Spec,
     _tcp_stream: Option<TcpStream>,
 }
@@ -22,10 +22,19 @@ pub struct ISOTcpClient {
 impl ISOTcpClient {
     /// Creates a new ISOTcpClient
     pub fn new(server_addr: &str, spec: &'static Spec, mli_type: MLIType) -> ISOTcpClient {
+        let mut mli: Box<dyn MLI>;
+
+        match mli_type {
+            MLIType::MLI2E => mli = Box::new(MLI2E {}),
+            MLIType::MLI2I => mli = Box::new(MLI2I {}),
+            MLIType::MLI4E => mli = Box::new(MLI4E {}),
+            MLIType::MLI4I => mli = Box::new(MLI4I {})
+        }
+
         ISOTcpClient {
             server_addr: server_addr.to_string(),
             spec,
-            mli_type,
+            mli,
             _tcp_stream: None,
         }
     }
@@ -35,8 +44,7 @@ impl ISOTcpClient {
     pub fn send(&mut self, iso_msg: &IsoMsg) -> Result<IsoMsg, IsoError> {
         match iso_msg.assemble() {
             Ok(data) => {
-                let mli = &crate::iso8583::mli::MLI2E {};
-                let mut buf = mli.create(&data.len()).unwrap();
+                let mut buf = self.mli.create(&data.len()).unwrap();
                 buf.extend(data);
                 self.send_recv(&buf)
             }
@@ -66,25 +74,10 @@ impl ISOTcpClient {
 
         // read the response
 
+        self.mli.parse(client.borrow_mut());
+
         let mut reader = BufReader::new(&mut client);
         let mut len: u32;
-
-        match &self.mli_type {
-            MLIType::MLI2E => {
-                len = reader.read_u16::<byteorder::BigEndian>().unwrap() as u32;
-            }
-            MLIType::MLI2I => {
-                len = reader.read_u16::<byteorder::BigEndian>().unwrap() as u32;
-                len -= 2;
-            }
-            MLIType::MLI4E => {
-                len = reader.read_u32::<byteorder::BigEndian>().unwrap() as u32;
-            }
-            MLIType::MLI4I => {
-                len = reader.read_u32::<byteorder::BigEndian>().unwrap() as u32;
-                len -= 4;
-            }
-        }
 
 
         let mut out_buf = vec![0; len as usize];
