@@ -288,17 +288,18 @@ impl Display for IsoMsg {
         let mut ordered_fields = vec![];
         self.msg.fields.iter().for_each(|f| collect_children(f.as_ref(), &mut ordered_fields));
 
+        res = res + format!("\n{:20.40} : {:5}  : {} ", "-Field-", "-Position-", "-Field Value-").as_str();
         for f in ordered_fields {
             if self.fd_map.contains_key(f.as_str()) {
                 let field = self.msg.field_by_name(&f).unwrap();
                 let field_value = &self.fd_map.get(f.as_str()).unwrap();
                 let mut pos_str: String = String::new();
                 if field.position() > 0 {
-                    pos_str = format!("[{:03}]", field.position());
+                    pos_str = format!("{:03}", field.position());
                 }
 
                 //debug!("** formatting {}",field.name());
-                res = res + format!("\n{:20.40} {:4}: {} ", f, pos_str.as_str(), field.to_string(field_value)).as_str();
+                res = res + format!("\n{:20.40} : {:10}  : {} ", f, pos_str.as_str(), field.to_string(field_value)).as_str();
             }
         }
         f.write_str(&res).unwrap();

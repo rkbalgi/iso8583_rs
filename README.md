@@ -31,10 +31,11 @@ extern crate lazy_static;
 extern crate log;
 extern crate simplelog;
 
-use iso8583_rs::iso8583::{IsoError, server};
+use iso8583_rs::iso8583::IsoError;
 use iso8583_rs::iso8583::iso_spec::{IsoMsg, new_msg};
-use iso8583_rs::iso8583::server::IsoServer;
+use iso8583_rs::iso8583::server::ISOServer;
 use iso8583_rs::iso8583::server::MsgProcessor;
+use iso8583_rs::iso8583::mli::MLIType::MLI2E;
 
 
 // Below is an example implementation of a MsgProcessor i.e the entity responsible for handling incoming messages
@@ -44,7 +45,7 @@ pub struct SampleMsgProcessor {}
 
 
 impl MsgProcessor for SampleMsgProcessor {
-    fn process(&self, iso_server: &IsoServer, msg: &mut Vec<u8>) -> Result<(Vec<u8>, IsoMsg), IsoError> {
+    fn process(&self, iso_server: &ISOServer, msg: &mut Vec<u8>) -> Result<(Vec<u8>, IsoMsg), IsoError> {
         match iso_server.spec.parse(msg) {
             Ok(iso_msg) => {
                 debug!("parsed incoming request - message = \"{}\" successfully. \n : parsed message: \n --- \n {} \n ----\n",
@@ -147,9 +148,10 @@ fn main() {
     let iso_spec = iso8583_rs::iso8583::iso_spec::spec("");
 
     info!("starting iso server for spec {} at port {}", iso_spec.name(), 6666);
-    let server: IsoServer = match server::new("127.0.0.1:6666".to_string(),
-                                              Box::new(iso8583_rs::iso8583::mli::MLI2E {}),
-                                              Box::new(SampleMsgProcessor {}), iso_spec) {
+    let server = match ISOServer::new("127.0.0.1:6666".to_string(),
+                                      iso_spec,
+                                      MLI2E,
+                                      Box::new(SampleMsgProcessor {})) {
         Ok(server) => {
             server
         }
@@ -162,43 +164,46 @@ fn main() {
 }
 
 
+
 ```
 
 ## Sample TCP client
 
 ```rust
-
-fn send_reversal() -> Result<(), Error> {
+    
+    fn test_send_recv_iso_1100() -> Result<(), IsoError> {
         std::env::set_var("SPEC_FILE", "sample_spec/sample_spec.yaml");
 
         let spec = crate::iso8583::iso_spec::spec("");
-        let msg_seg = spec.get_message_from_header("1420").unwrap();
+        let msg_seg = spec.get_message_from_header("1100").unwrap();
 
         let mut iso_msg = iso_spec::new_msg(spec, msg_seg);
 
-        &iso_msg.set("message_type", "1420").unwrap();
+        &iso_msg.set("message_type", "1100").unwrap();
         &iso_msg.set_on(2, "123456789101").unwrap();
         &iso_msg.set_on(3, "004000").unwrap();
         &iso_msg.set_on(4, "000000000199").unwrap();
         &iso_msg.set_on(11, "779581").unwrap();
         &iso_msg.set_on(14, "2204").unwrap();
         &iso_msg.set_on(19, "840").unwrap();
+        &iso_msg.set_on(52, "0102030405060708").unwrap();
+        &iso_msg.set_on(61, "Raghavendra").unwrap();
+        &iso_msg.set_on(62, "Raghavendra Balgi").unwrap();
+        &iso_msg.set_on(63, "87877622525").unwrap();
         &iso_msg.set_on(96, "1234").unwrap();
         &iso_msg.set_on(160, "5678").unwrap();
 
+        let mut client = ISOTcpClient::new("localhost:6666", &spec, MLI2E);
 
-        match iso_msg.assemble() {
-            Ok(data) => {
-                let mli = &crate::iso8583::mli::MLI2E {};
-                let mut buf = mli.create(&data.len()).unwrap();
-                buf.extend(data);
-                send_recv(&buf)
+        match client.send(&iso_msg) {
+            Ok(resp_iso_msg) => {
+                println!("Received {} \n {}", resp_iso_msg.msg.name(), resp_iso_msg);
             }
             Err(e) => {
-                println!("Failed to assemble request message: {}", e.msg);
-                Ok(())
+                eprintln!("{:?}", e)
             }
         }
+        Ok(())
     }
 
 ```
@@ -208,14 +213,15 @@ fn send_reversal() -> Result<(), Error> {
 
 ```
 C:/Users/rkbal/.cargo/bin/cargo.exe run --color=always --package iso8583_rs --bin iso8583_rs
-   Compiling iso8583_rs v0.1.3 (C:\Users\rkbal\IdeaProjects\iso8583_rs)
-    Finished dev [unoptimized + debuginfo] target(s) in 4.75s
+
+
+    Finished dev [unoptimized + debuginfo] target(s) in 0.11s
      Running `target\debug\iso8583_rs.exe`
 current-dir: C:\Users\rkbal\IdeaProjects\iso8583_rs
 spec-file: sample_spec\sample_spec.yaml
-20:10:04 [INFO] starting iso server for spec SampleSpec at port 6666
-20:10:14 [DEBUG] (2) iso8583_rs::iso8583::server: Accepted new connection .. Ok(V6([::1]:57018))
-20:10:14 [DEBUG] (3) iso8583_rs::iso8583::server: received request: 
+07:21:51 [INFO] starting iso server for spec SampleSpec at port 6666
+07:22:03 [DEBUG] (2) iso8583_rs::iso8583::server: Accepted new connection .. Ok(V4(127.0.0.1:57780))
+07:22:03 [DEBUG] (3) iso8583_rs::iso8583::server: received request: 
 
 |31313030 f0242000 0000100e 80000001| 1100.$ ......... 00000000
 |00000000 00000001 00000000 31323132| ............1212 00000010
@@ -225,55 +231,56 @@ spec-file: sample_spec\sample_spec.yaml
 |08001152 61676861 76656e64 726111d9| ...Raghavendra.. 00000050
 |81878881 a5859584 998140c2 81938789| ..........@..... 00000060
 |f0f1f138 37383737 36323235 32353132| ...8787762252512 00000070
-|33343838 3838|                       348888           00000080
+|33343536 3738|                       345678           00000080
                                                        00000086
 
  len = 134
-20:10:14 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: computed header value for incoming message = 1100
-20:10:14 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: parsing field : message_type
-20:10:14 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: parsing field : bitmap
-20:10:14 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - pan
-20:10:14 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - proc_code
-20:10:14 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - amount
-20:10:14 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - stan
-20:10:14 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - expiration_date
-20:10:14 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - country_code
-20:10:14 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - pin_data
-20:10:14 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - private_1
-20:10:14 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - private_2
-20:10:14 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - private_3
-20:10:14 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - key_mgmt_data
-20:10:14 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - reserved_data
+07:22:03 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: computed header value for incoming message = 1100
+07:22:03 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: parsing field : message_type
+07:22:03 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: parsing field : bitmap
+07:22:03 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - pan
+07:22:03 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - proc_code
+07:22:03 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - amount
+07:22:03 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - stan
+07:22:03 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - expiration_date
+07:22:03 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - country_code
+07:22:03 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - pin_data
+07:22:03 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - private_1
+07:22:03 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - private_2
+07:22:03 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - private_3
+07:22:03 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - key_mgmt_data
+07:22:03 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - reserved_data
 24
-20:10:14 [DEBUG] (3) iso8583_rs: parsed incoming request - message = "1100 - Authorization" successfully. 
+07:22:03 [DEBUG] (3) iso8583_rs: parsed incoming request - message = "1100 - Authorization" successfully. 
  : parsed message: 
  --- 
  
-message_type             : 1100 
-bitmap                   : f02420000000100e80000001000000000000000100000000 
-pan                  [002]: 123456789101 
-proc_code            [003]: 004000 
-amount               [004]: 000000000199 
-stan                 [011]: 779581 
-expiration_date      [014]: 2204 
-country_code         [019]: 840 
-pin_data             [052]: 0102030405060708 
-private_1            [061]: Raghavendra 
-private_2            [062]: Raghavendra Balgi 
-private_3            [063]: 87877622525 
-key_mgmt_data        [096]: 1234 
-reserved_data        [160]: 8888  
+-Field-              : -Position-  : -Field Value- 
+message_type         :             : 1100 
+bitmap               :             : f02420000000100e80000001000000000000000100000000 
+pan                  : 002         : 123456789101 
+proc_code            : 003         : 004000 
+amount               : 004         : 000000000199 
+stan                 : 011         : 779581 
+expiration_date      : 014         : 2204 
+country_code         : 019         : 840 
+pin_data             : 052         : 0102030405060708 
+private_1            : 061         : Raghavendra 
+private_2            : 062         : Raghavendra Balgi 
+private_3            : 063         : 87877622525 
+key_mgmt_data        : 096         : 1234 
+reserved_data        : 160         : 5678  
  ----
 
-20:10:14 [DEBUG] (3) iso8583_rs: amount = 199
-20:10:14 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: echoing .. 2: 123456789101
-20:10:14 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: echoing .. 3: 004000
-20:10:14 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: echoing .. 4: 000000000199
-20:10:14 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: echoing .. 11: 779581
-20:10:14 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: echoing .. 14: 2204
-20:10:14 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: echoing .. 19: 840
-20:10:14 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: echoing .. 96: 1234
-20:10:14 [DEBUG] (3) iso8583_rs::iso8583::server: iso_response : 
+07:22:03 [DEBUG] (3) iso8583_rs: amount = 199
+07:22:03 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: echoing .. 2: 123456789101
+07:22:03 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: echoing .. 3: 004000
+07:22:03 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: echoing .. 4: 000000000199
+07:22:03 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: echoing .. 11: 779581
+07:22:03 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: echoing .. 14: 2204
+07:22:03 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: echoing .. 19: 840
+07:22:03 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: echoing .. 96: 1234
+07:22:03 [DEBUG] (3) iso8583_rs::iso8583::server: iso_response : 
 |31313130 f0242000 0200000e 00000001| 1110.$ ......... 00000000
 |00000000 31323132 33343536 37383931| ....121234567891 00000010
 |30313030 34303030 30303030 30303030| 0100400000000000 00000020
@@ -285,22 +292,26 @@ reserved_data        [160]: 8888
                                                        00000077
  
  parsed :
---- 
-message_type             : 1110 
-bitmap                   : f02420000200000e0000000100000000 
-pan                  [002]: 123456789101 
-proc_code            [003]: 004000 
-amount               [004]: 000000000199 
-stan                 [011]: 779581 
-expiration_date      [014]: 2204 
-country_code         [019]: 840 
-action_code          [039]: 100 
-private_1            [061]: Raghavendra - OK 
-private_2            [062]: Raghavendra Balgi - OK 
-private_3            [063]: 007 
-key_mgmt_data        [096]: 1234  -- 
+ --- 
+-Field-              : -Position-  : -Field Value- 
+message_type         :             : 1110 
+bitmap               :             : f02420000200000e0000000100000000 
+pan                  : 002         : 123456789101 
+proc_code            : 003         : 004000 
+amount               : 004         : 000000000199 
+stan                 : 011         : 779581 
+expiration_date      : 014         : 2204 
+country_code         : 019         : 840 
+action_code          : 039         : 100 
+private_1            : 061         : Raghavendra - OK 
+private_2            : 062         : Raghavendra Balgi - OK 
+private_3            : 063         : 007 
+key_mgmt_data        : 096         : 1234  
+ --- 
 
-20:10:14 [INFO] client socket closed : [::1]:57018
+07:22:03 [DEBUG] (3) iso8583_rs::iso8583::server: request processing time = 1 millis
+07:22:03 [INFO] client socket closed : 127.0.0.1:57780
+
 
 ``` 
 
@@ -309,9 +320,13 @@ key_mgmt_data        [096]: 1234  --
 Now run src/iso8583/test.rs:test_send_recv_iso(..)
 
 ```
-Testing started at 01:40 ...
-raw iso msg = 008631313030f02420000000100e80000001000000000000000100000000313231323334353637383931303130303430303030303030303030303031393937373935383132323034f8f4f001020304050607080011526167686176656e64726111d981878881a5859584998140c281938789f0f1f138373837373632323532353132333438383838
-received response: with  119 bytes.
+Testing started at 12:52 ...
+current-dir: C:\Users\rkbal\IdeaProjects\iso8583_rs
+spec-file: sample_spec/sample_spec.yaml
+raw iso msg = 008631313030f02420000000100e80000001000000000000000100000000313231323334353637383931303130303430303030303030303030303031393937373935383132323034f8f4f001020304050607080011526167686176656e64726111d981878881a5859584998140c281938789f0f1f138373837373632323532353132333435363738
+connected to server @ Ok(V4(127.0.0.1:57780))
+received response: with  119 bytes. 
+ 
 |31313130 f0242000 0200000e 00000001| 1110.$ ......... 00000000
 |00000000 31323132 33343536 37383931| ....121234567891 00000010
 |30313030 34303030 30303030 30303030| 0100400000000000 00000020
@@ -321,25 +336,24 @@ received response: with  119 bytes.
 |998140c2 81938789 406040d6 d2f0f0f3| ..@.....@`@..... 00000060
 |30303731 323334|                     0071234          00000070
                                                        00000077
-current-dir: C:\Users\rkbal\IdeaProjects\iso8583_rs
-spec-file: sample_spec/sample_spec.yaml
+
+
 16
-parsed iso-response "1100 - Authorization" 
+Received 1100 - Authorization 
  
-message_type             : 1110 
-bitmap                   : f02420000200000e0000000100000000 
-pan                  [002]: 123456789101 
-proc_code            [003]: 004000 
-amount               [004]: 000000000199 
-stan                 [011]: 779581 
-expiration_date      [014]: 2204 
-country_code         [019]: 840 
-action_code          [039]: 100 
-private_1            [061]: Raghavendra - OK 
-private_2            [062]: Raghavendra Balgi - OK 
-private_3            [063]: 007 
-key_mgmt_data        [096]: 1234  
-
-
+-Field-              : -Position-  : -Field Value- 
+message_type         :             : 1110 
+bitmap               :             : f02420000200000e0000000100000000 
+pan                  : 002         : 123456789101 
+proc_code            : 003         : 004000 
+amount               : 004         : 000000000199 
+stan                 : 011         : 779581 
+expiration_date      : 014         : 2204 
+country_code         : 019         : 840 
+action_code          : 039         : 100 
+private_1            : 061         : Raghavendra - OK 
+private_2            : 062         : Raghavendra Balgi - OK 
+private_3            : 063         : 007 
+key_mgmt_data        : 096         : 1234
 ```
 

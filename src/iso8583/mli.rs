@@ -2,6 +2,14 @@
 use crate::iso8583::IsoError;
 use byteorder::{ByteOrder, WriteBytesExt};
 
+
+pub enum MLIType {
+    MLI2E,
+    MLI2I,
+    MLI4E,
+    MLI4I,
+}
+
 pub trait MLI: Sync + Send {
     /// Parses and returns a u32 that is equal to the number of bytes
     /// in the message or an IsoError if there are insufficient bytes etc

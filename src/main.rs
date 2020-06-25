@@ -5,10 +5,11 @@ extern crate lazy_static;
 extern crate log;
 extern crate simplelog;
 
-use iso8583_rs::iso8583::{IsoError, server};
+use iso8583_rs::iso8583::IsoError;
 use iso8583_rs::iso8583::iso_spec::{IsoMsg, new_msg};
-use iso8583_rs::iso8583::server::IsoServer;
+use iso8583_rs::iso8583::server::ISOServer;
 use iso8583_rs::iso8583::server::MsgProcessor;
+use iso8583_rs::iso8583::mli::MLIType::MLI2E;
 
 
 // Below is an example implementation of a MsgProcessor i.e the entity responsible for handling incoming messages
@@ -18,7 +19,7 @@ pub struct SampleMsgProcessor {}
 
 
 impl MsgProcessor for SampleMsgProcessor {
-    fn process(&self, iso_server: &IsoServer, msg: &mut Vec<u8>) -> Result<(Vec<u8>, IsoMsg), IsoError> {
+    fn process(&self, iso_server: &ISOServer, msg: &mut Vec<u8>) -> Result<(Vec<u8>, IsoMsg), IsoError> {
         match iso_server.spec.parse(msg) {
             Ok(iso_msg) => {
                 debug!("parsed incoming request - message = \"{}\" successfully. \n : parsed message: \n --- \n {} \n ----\n",
@@ -121,9 +122,10 @@ fn main() {
     let iso_spec = iso8583_rs::iso8583::iso_spec::spec("");
 
     info!("starting iso server for spec {} at port {}", iso_spec.name(), 6666);
-    let server: IsoServer = match server::new("127.0.0.1:6666".to_string(),
-                                              Box::new(iso8583_rs::iso8583::mli::MLI2E {}),
-                                              Box::new(SampleMsgProcessor {}), iso_spec) {
+    let server = match ISOServer::new("127.0.0.1:6666".to_string(),
+                                      iso_spec,
+                                      MLI2E,
+                                      Box::new(SampleMsgProcessor {})) {
         Ok(server) => {
             server
         }

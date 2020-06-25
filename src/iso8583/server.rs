@@ -6,7 +6,7 @@ use std::thread::JoinHandle;
 
 use crate::iso8583::{IsoError};
 use crate::iso8583::iso_spec::{IsoMsg, Spec};
-use crate::iso8583::mli::MLI;
+use crate::iso8583::mli::{MLI, MLIType, MLI2E, MLI2I, MLI4E, MLI4I};
 use hexdump::hexdump_iter;
 
 
@@ -16,7 +16,7 @@ pub struct IsoServerError {
 }
 
 /// This struct represents a IsoServer
-pub struct IsoServer {
+pub struct ISOServer {
     /// The listen address for this server
     sock_addr: Vec<SocketAddr>,
     pub(crate) mli: Arc<Box<dyn MLI>>,
@@ -28,13 +28,48 @@ pub struct IsoServer {
 
 /// This trait whose implementation is used by the IsoServer to handle incoming requests
 pub trait MsgProcessor: Send + Sync {
-    fn process(&self, iso_server: &IsoServer, msg: &mut Vec<u8>) -> Result<(Vec<u8>, IsoMsg), IsoError>;
+    fn process(&self, iso_server: &ISOServer, msg: &mut Vec<u8>) -> Result<(Vec<u8>, IsoMsg), IsoError>;
 }
 
-impl IsoServer {
+impl ISOServer {
+    /// Returns a new ISO server on success or a IsoServer if the provided addr is incorrect
+    pub fn new<'a>(host_port: String, spec: &'static Spec, mli_type: MLIType, msg_processor: Box<dyn MsgProcessor>) -> Result<ISOServer, IsoServerError> {
+        let mli: Arc<Box<dyn MLI>>;
+
+        match mli_type {
+            MLIType::MLI2E => {
+                mli = Arc::new(Box::new(MLI2E {}));
+            }
+            MLIType::MLI2I => {
+                mli = Arc::new(Box::new(MLI2I {}));
+            }
+            MLIType::MLI4E => {
+                mli = Arc::new(Box::new(MLI4E {}));
+            }
+            MLIType::MLI4I => {
+                mli = Arc::new(Box::new(MLI4I {}));
+            }
+        }
+
+        match host_port.to_socket_addrs() {
+            Ok(addrs) => {
+                let addrs = addrs.as_slice();
+                //use only ipv4 for now
+                let addrs = addrs.iter().filter(|s| s.is_ipv4()).map(|s| *s).collect::<Vec<SocketAddr>>();
+
+                if addrs.len() > 0 {
+                    Ok(ISOServer { sock_addr: addrs, spec, mli, msg_processor: Arc::new(msg_processor) })
+                } else {
+                    Err(IsoServerError { msg: format!("invalid host_port: {} : unresolvable?", &host_port) })
+                }
+            }
+            Err(e) => Err(IsoServerError { msg: format!("invalid host_port: {}: cause: {}", &host_port, e.to_string()) })
+        }
+    }
+
     /// Starts the server in a separate thread
     pub fn start(&self) -> JoinHandle<()> {
-        let server = IsoServer {
+        let server = ISOServer {
             sock_addr: self.sock_addr.clone(),
             spec: self.spec,
             mli: self.mli.clone(),
@@ -54,8 +89,8 @@ impl IsoServer {
 }
 
 /// Runs a new thread to handle a new incoming connection
-fn new_client(iso_server: &IsoServer, stream_: TcpStream) {
-    let server = IsoServer {
+fn new_client(iso_server: &ISOServer, stream_: TcpStream) {
+    let server = ISOServer {
         sock_addr: iso_server.sock_addr.clone(),
         spec: iso_server.spec,
         mli: iso_server.mli.clone(),
@@ -96,7 +131,7 @@ fn new_client(iso_server: &IsoServer, stream_: TcpStream) {
 
                                     match server.msg_processor.process(&server, &mut data.to_vec()) {
                                         Ok(resp) => {
-                                            debug!("iso_response : {} \n parsed :\n--- {} -- \n", get_hexdump(&resp.0), resp.1);
+                                            debug!("iso_response : {} \n parsed :\n --- {} \n --- \n", get_hexdump(&resp.0), resp.1);
                                             match server.mli.create(&(resp.0).len()) {
                                                 Ok(mut resp_data) => {
                                                     debug!("request processing time = {} millis", std::time::Instant::now().duration_since(t1).as_millis());
@@ -134,25 +169,8 @@ fn new_client(iso_server: &IsoServer, stream_: TcpStream) {
     });
 }
 
-/// Returns a new ISO server on success or a IsoServer if the provided addr is incorrect
-pub fn new<'a>(host_port: String, mli: Box<dyn MLI>, msg_processor: Box<dyn MsgProcessor>, spec: &'static Spec) -> Result<IsoServer, IsoServerError> {
-    match host_port.to_socket_addrs() {
-        Ok(addrs) => {
-            let addrs = addrs.as_slice();
-            //use only ipv4 for now
-            let addrs = addrs.iter().filter(|s| s.is_ipv4()).map(|s| *s).collect::<Vec<SocketAddr>>();
 
-            if addrs.len() > 0 {
-                Ok(IsoServer { sock_addr: addrs, spec, mli: Arc::new(mli), msg_processor: Arc::new(msg_processor) })
-            } else {
-                Err(IsoServerError { msg: format!("invalid host_port: {} : unresolvable?", &host_port) })
-            }
-        }
-        Err(e) => Err(IsoServerError { msg: format!("invalid host_port: {}: cause: {}", &host_port, e.to_string()) })
-    }
-}
-
-fn get_hexdump(data: &Vec<u8>) -> String {
+pub(in crate::iso8583) fn get_hexdump(data: &Vec<u8>) -> String {
     let mut hexdmp = String::new();
     hexdmp.push_str("\n");
     hexdump_iter(data).for_each(|f| {
