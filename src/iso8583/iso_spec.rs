@@ -7,6 +7,7 @@ use std::io::Cursor;
 use crate::iso8583::{bitmap, IsoError};
 use crate::iso8583::field::{Field, ParseError};
 use crate::iso8583::yaml_de::YMessageSegment;
+use crate::iso8583::bitmap::Bitmap;
 
 // Reads the spec definitions from YAML file
 lazy_static! {
@@ -299,7 +300,7 @@ impl Display for IsoMsg {
                 }
 
                 //debug!("** formatting {}",field.name());
-                res = res + format!("\n{:20.40} : {:10}  : {} ", f, pos_str.as_str(), field.to_string(field_value)).as_str();
+                res = res + format!("\n{:20.40} : {:^10}  : {} ", f, pos_str.as_str(), field.to_string(field_value)).as_str();
             }
         }
         f.write_str(&res).unwrap();
@@ -319,7 +320,7 @@ pub fn new_msg(spec: &'static Spec, seg: &'static MessageSegment) -> IsoMsg {
         spec,
         msg: seg,
         fd_map: HashMap::new(),
-        bmp: crate::iso8583::bitmap::new_bmp(0, 0, 0),
+        bmp: Bitmap::new(0, 0, 0),
     }
 }
 
@@ -335,7 +336,7 @@ impl Spec {
             spec: &self,
             msg: &msg.unwrap(),
             fd_map: HashMap::new(),
-            bmp: bitmap::new_bmp(0, 0, 0),
+            bmp: Bitmap::new(0, 0, 0),
         };
 
         let mut cp_data = Cursor::new(data);
@@ -348,7 +349,7 @@ impl Spec {
                     //if this is "THE" bitmap, then save it on isomsg
                     if f.name() == "bitmap" {
                         let bmp_data = iso_msg.fd_map.get(f.name()).unwrap();
-                        iso_msg.bmp = bitmap::from_vec(bmp_data);
+                        iso_msg.bmp = Bitmap::from_vec(bmp_data);
                     }
                     Ok(())
                 }
