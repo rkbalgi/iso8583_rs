@@ -15,8 +15,40 @@ pub struct Bitmap {
     t_bmp: u64,
 }
 
+//const high_bit: u64 = (0x01 as u64) << 63;
+
 /// Operations on bitmap
 impl Bitmap {
+    /// Creates and returns a new Bitmap
+    pub fn new(b1: u64, b2: u64, b3: u64) -> Bitmap {
+        Bitmap {
+            p_bmp: b1,
+            s_bmp: b2,
+            t_bmp: b3,
+        }
+    }
+
+    // Create a Bitmap from a Vec<u8>
+    pub fn from_vec(bmp_data: &Vec<u8>) -> Bitmap {
+        println!("{}", bmp_data.len());
+        assert!(bmp_data.len() >= 8 && bmp_data.len() <= 24);
+        let mut b1: u64 = 0;
+        let mut b2: u64 = 0;
+        let mut b3: u64 = 0;
+
+
+        if bmp_data.len() >= 8 {
+            b1 = byteorder::BigEndian::read_u64(&bmp_data[0..8]);
+        }
+        if bmp_data.len() >= 16 {
+            b2 = byteorder::BigEndian::read_u64(&bmp_data[8..16]);
+        }
+        if bmp_data.len() >= 24 {
+            b3 = byteorder::BigEndian::read_u64(&bmp_data[16..]);
+        }
+        Bitmap::new(b1, b2, b3)
+    }
+
     /// Returns a boolean to indicate if the specified 'pos' is turned on in the bitmap
     pub fn is_on(&self, pos: u32) -> bool {
         assert!(pos > 0 && pos <= 192);
@@ -74,7 +106,7 @@ impl Bitmap {
 
 #[test]
 fn test_bmp() {
-    let mut bmp = new_bmp(0, 0, 0);
+    let mut bmp = Bitmap::new(0, 0, 0);
     bmp.set_on(4);
     bmp.set_on(11);
     bmp.set_on(64);
@@ -89,35 +121,6 @@ fn test_bmp() {
     }
 }
 
-/// Creates and returns a new Bitmap
-pub fn new_bmp(b1: u64, b2: u64, b3: u64) -> Bitmap {
-    Bitmap {
-        p_bmp: b1,
-        s_bmp: b2,
-        t_bmp: b3,
-    }
-}
-
-
-pub fn from_vec(bmp_data: &Vec<u8>) -> Bitmap {
-    println!("{}", bmp_data.len());
-    assert!(bmp_data.len() >= 8 && bmp_data.len() <= 24);
-    let mut b1: u64 = 0;
-    let mut b2: u64 = 0;
-    let mut b3: u64 = 0;
-
-
-    if bmp_data.len() >= 8 {
-        b1 = byteorder::BigEndian::read_u64(&bmp_data[0..8]);
-    }
-    if bmp_data.len() >= 16 {
-        b2 = byteorder::BigEndian::read_u64(&bmp_data[8..16]);
-    }
-    if bmp_data.len() >= 24 {
-        b3 = byteorder::BigEndian::read_u64(&bmp_data[16..]);
-    }
-    new_bmp(b1, b2, b3)
-}
 
 /// This struct represents a bitmapped field in the ISO message
 pub struct BmpField {
@@ -187,7 +190,7 @@ impl Field for BmpField {
                 }
 
 
-                let bmp = new_bmp(b1, b2, b3);
+                let bmp = Bitmap::new(b1, b2, b3);
                 f2d_map.insert(self.name().to_string(), bmp.as_vec());
 
 
