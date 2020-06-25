@@ -12,10 +12,8 @@ pub enum MLIType {
 }
 
 pub trait MLI: Sync + Send {
-    /// Parses and returns a u32 that is equal to the number of bytes
-    /// in the message or an IsoError if there are insufficient bytes etc
-    fn parse<T>(&self, in_buf: &mut T) -> Result<u32, IsoError>;
-
+    fn parse(&self, in_buf: &mut Vec<u8>) -> Result<u32, IsoError>;
+    fn parse_from_reader(&self, in_buf: &mut dyn Read) -> Result<u32, IsoError>;
     /// Creates a Vec<u8> that represents the MLI containing n bytes
     fn create(&self, n: &usize) -> Result<Vec<u8>, IsoError>;
 }
@@ -34,14 +32,18 @@ pub struct MLI4I {}
 
 
 impl MLI for MLI2E {
-    fn parse<T>(&self, in_buf: &mut T) -> Result<u32, IsoError>
-        where T: Read
+    fn parse(&self, in_buf: &mut Vec<u8>) -> Result<u32, IsoError>
     {
-        match in_buf.read_u16() {
-            Ok(n) => Ok(n as u32),
-            Err(e) => {
-                Err(IsoError { msg: "insufficient bytes in buf".to_string() });
-            }
+        let n = byteorder::BigEndian::read_u16(in_buf);
+        in_buf.drain(0..2).for_each(|f| drop(f));
+        Ok(n as u32)
+    }
+
+    fn parse_from_reader(&self, in_buf: &mut dyn Read) -> Result<u32, IsoError> {
+        let mut data: Vec<u8> = vec![0; 2];
+        match in_buf.read_exact(&mut data[..]) {
+            Ok(_) => self.parse(&mut data),
+            Err(e) => Err(IsoError { msg: e.to_string() })
         }
     }
 
@@ -52,15 +54,20 @@ impl MLI for MLI2E {
     }
 }
 
+
 impl MLI for MLI4E {
-    fn parse<T>(&self, in_buf: &mut T) -> Result<u32, IsoError>
-        where T: Read
-    {
-        match in_buf.read_u32() {
-            Ok(n) => Ok(n as u32),
-            Err(e) => {
-                Err(IsoError { msg: "insufficient bytes in buf".to_string() });
-            }
+    fn parse(&self, in_buf: &mut Vec<u8>) -> Result<u32, IsoError> {
+        let n = byteorder::BigEndian::read_u32(in_buf);
+        in_buf.drain(0..4).for_each(|f| drop(f));
+        Ok(n)
+    }
+
+
+    fn parse_from_reader(&self, in_buf: &mut dyn Read) -> Result<u32, IsoError> {
+        let mut data: Vec<u8> = vec![0; 4];
+        match in_buf.read_exact(&mut data[..]) {
+            Ok(_) => self.parse(&mut data),
+            Err(e) => Err(IsoError { msg: e.to_string() })
         }
     }
 
@@ -71,18 +78,22 @@ impl MLI for MLI4E {
     }
 }
 
+
 impl MLI for MLI2I {
-    fn parse<T>(&self, in_buf: &mut T) -> Result<u32, IsoError>
-        where T: Read
+    fn parse(&self, in_buf: &mut Vec<u8>) -> Result<u32, IsoError>
     {
-        match in_buf.read_u16() {
-            Ok(n) => Ok((n-2) as u32),
-            Err(e) => {
-                Err(IsoError { msg: "insufficient bytes in buf".to_string() });
-            }
-        }
+        let n = byteorder::BigEndian::read_u16(in_buf);
+        in_buf.drain(0..2).for_each(|f| drop(f));
+        Ok((n - 2) as u32)
     }
 
+    fn parse_from_reader(&self, in_buf: &mut dyn Read) -> Result<u32, IsoError> {
+        let mut data: Vec<u8> = vec![0; 2];
+        match in_buf.read_exact(&mut data[..]) {
+            Ok(_) => self.parse(&mut data),
+            Err(e) => Err(IsoError { msg: e.to_string() })
+        }
+    }
 
     fn create(&self, n: &usize) -> Result<Vec<u8>, IsoError> {
         let mut mli = Vec::<u8>::new();
@@ -92,17 +103,19 @@ impl MLI for MLI2I {
 }
 
 impl MLI for MLI4I {
-    fn parse<T>(&self, in_buf: &mut T) -> Result<u32, IsoError>
-        where T: Read
-    {
-        match in_buf.read_u32() {
-            Ok(n) => Ok((n-4) as u32),
-            Err(e) => {
-                Err(IsoError { msg: "insufficient bytes in buf".to_string() });
-            }
-        }
+    fn parse(&self, in_buf: &mut Vec<u8>) -> Result<u32, IsoError> {
+        let n = byteorder::BigEndian::read_u32(in_buf);
+        in_buf.drain(0..4).for_each(|f| drop(f));
+        Ok(n - 4)
     }
 
+    fn parse_from_reader(&self, in_buf: &mut dyn Read) -> Result<u32, IsoError> {
+        let mut data: Vec<u8> = vec![0; 4];
+        match in_buf.read_exact(&mut data[..]) {
+            Ok(_) => self.parse(&mut data),
+            Err(e) => Err(IsoError { msg: e.to_string() })
+        }
+    }
 
     fn create(&self, n: &usize) -> Result<Vec<u8>, IsoError> {
         let mut mli = Vec::<u8>::new();

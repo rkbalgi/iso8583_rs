@@ -38,11 +38,9 @@ impl MsgProcessor for SampleMsgProcessor {
                 let mut iso_resp_msg = new_msg(&iso_msg.spec, &iso_msg.spec.get_message_from_header(resp_msg_type).unwrap());
 
                 if req_msg_type == "1420" {
-
                     iso_resp_msg.set("message_type", resp_msg_type).unwrap_or_default();
                     iso_resp_msg.echo_from(&iso_msg, &[2, 3, 4, 11, 14, 19, 96])?;
                     iso_resp_msg.set_on(39, "400").unwrap_or_default();
-
                 } else if req_msg_type == "1100" {
                     handle_1100(&iso_msg, &mut iso_resp_msg)?
                 }
@@ -84,12 +82,14 @@ fn handle_1100(iso_msg: &IsoMsg, iso_resp_msg: &mut IsoMsg) -> Result<(), IsoErr
 
                     if iso_msg.bmp.is_on(61) {
                         let mut val = iso_msg.bmp_child_value(61).unwrap();
-                        iso_resp_msg.set_on(61, val.push_str(" - OK").as_str()).unwrap_or_default();
+                        val += "-OK";
+                        iso_resp_msg.set_on(61, val.as_str());
                     }
 
                     if iso_msg.bmp.is_on(62) {
                         let mut val = iso_msg.bmp_child_value(62).unwrap();
-                        iso_resp_msg.set_on(62, val.push_str(" - OK").as_str()).unwrap_or_default();
+                        val += "-OK";
+                        iso_resp_msg.set_on(62, val.as_str());
                     }
 
                     iso_resp_msg.set_on(63, "007").unwrap_or_default();

@@ -5,7 +5,6 @@ use crate::iso8583::IsoError;
 use std::net::TcpStream;
 use crate::iso8583::mli::{MLI, MLIType, MLI2E, MLI2I, MLI4E, MLI4I};
 use std::io::{Write, BufReader, Read};
-use byteorder::ReadBytesExt;
 use crate::iso8583::server::get_hexdump;
 use std::borrow::BorrowMut;
 
@@ -73,16 +72,15 @@ impl ISOTcpClient {
         client.flush();
 
         // read the response
-
-        self.mli.parse(client.borrow_mut());
-
-        let mut reader = BufReader::new(&mut client);
-        let mut len: u32;
-
+        let len: u32;
+        match self.mli.parse_from_reader(client.borrow_mut()) {
+            Ok(n) => len = n,
+            Err(e) => return Err(e)
+        };
 
         let mut out_buf = vec![0; len as usize];
 
-        match reader.read_exact(&mut out_buf[..]) {
+        match client.read_exact(&mut out_buf[..]) {
             Ok(()) => {
                 println!("received response: with  {} bytes. \n {}\n", len, get_hexdump(&out_buf));
                 match self.spec.parse(&mut out_buf) {
