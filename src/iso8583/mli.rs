@@ -1,6 +1,6 @@
 //! This module contains implementation of various MLI types associated with a ISO message
 use crate::iso8583::IsoError;
-use byteorder::{ByteOrder, WriteBytesExt, ReadBytesExt};
+use byteorder::{ByteOrder, WriteBytesExt};
 use std::io::Read;
 
 

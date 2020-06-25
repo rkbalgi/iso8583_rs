@@ -4,7 +4,7 @@ use crate::iso8583::iso_spec::{Spec, IsoMsg};
 use crate::iso8583::IsoError;
 use std::net::TcpStream;
 use crate::iso8583::mli::{MLI, MLIType, MLI2E, MLI2I, MLI4E, MLI4I};
-use std::io::{Write, BufReader, Read};
+use std::io::{Write, Read};
 use crate::iso8583::server::get_hexdump;
 use std::borrow::BorrowMut;
 
@@ -21,7 +21,7 @@ pub struct ISOTcpClient {
 impl ISOTcpClient {
     /// Creates a new ISOTcpClient
     pub fn new(server_addr: &str, spec: &'static Spec, mli_type: MLIType) -> ISOTcpClient {
-        let mut mli: Box<dyn MLI>;
+        let mli: Box<dyn MLI>;
 
         match mli_type {
             MLIType::MLI2E => mli = Box::new(MLI2E {}),
@@ -66,10 +66,9 @@ impl ISOTcpClient {
             }
         }
 
-        let mut client = (self._tcp_stream.as_mut()).unwrap();
+        let client = (self._tcp_stream.as_mut()).unwrap();
 
-        client.write_all(raw_msg.as_slice());
-        client.flush();
+        client.write_all(raw_msg.as_slice()).unwrap();
 
         // read the response
         let len: u32;
