@@ -7,6 +7,7 @@ extern crate byteorder;
 extern crate log;
 extern crate simplelog;
 extern crate serde_yaml;
+extern crate bytes;
 
 pub mod iso8583;
 

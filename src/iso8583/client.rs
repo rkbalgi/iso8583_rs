@@ -72,7 +72,7 @@ impl ISOTcpClient {
 
         // read the response
         let len: u32;
-        match self.mli.parse_from_reader(client.borrow_mut()) {
+        match self.mli.parse(client.borrow_mut()) {
             Ok(n) => len = n,
             Err(e) => return Err(e)
         };

@@ -8,6 +8,8 @@ use crate::iso8583::{IsoError};
 use crate::iso8583::iso_spec::{IsoMsg, Spec};
 use crate::iso8583::mli::{MLI, MLIType, MLI2E, MLI2I, MLI4E, MLI4I};
 use hexdump::hexdump_iter;
+use bytes::{BytesMut, Buf};
+use bytes::buf::{BufExt, BufMutExt};
 
 
 /// This struct represents an error associated with server errors
@@ -98,10 +100,10 @@ fn new_client(iso_server: &ISOServer, stream_: TcpStream) {
     };
 
     std::thread::spawn(move || {
-        let mut buf: [u8; 512] = [0; 512];
+        let mut buf = Vec::with_capacity(512);
         let mut stream = stream_;
         let mut reading_mli = true;
-        let mut in_buf: Vec<u8> = Vec::with_capacity(512);
+        let mut in_buf = BytesMut::with_capacity(1024);
         let mut mli: u32 = 0;
 
         loop {
@@ -109,13 +111,13 @@ fn new_client(iso_server: &ISOServer, stream_: TcpStream) {
                 Ok(n) => {
                     if n > 0 {
                         trace!("read {} from {}", hex::encode(&buf[0..n]), stream.peer_addr().unwrap().to_string());
-                        in_buf.append(&mut buf[0..n].to_vec());
-
+                        in_buf.extend_from_slice(&buf[0..n]);
 
                         while in_buf.len() > 0 {
                             if reading_mli {
                                 match server.mli.parse(&mut in_buf) {
                                     Ok(n) => {
+
                                         mli = n;
                                         reading_mli = false;
                                     }
@@ -124,12 +126,12 @@ fn new_client(iso_server: &ISOServer, stream_: TcpStream) {
                             } else {
                                 //reading data
                                 if mli > 0 && in_buf.len() >= mli as usize {
-                                    let data = &in_buf[0..mli as usize];
-
-                                    debug!("received request: \n{}\n len = {}", get_hexdump(&data.to_vec()), mli);
+                                    //let mut data = vec![0; mli as usize];
+                                    let mut data = Vec::from(in_buf.take(mli as usize).bytes());
+                                    debug!("received request: \n{}\n len = {}", get_hexdump(&data), mli);
                                     let t1 = std::time::Instant::now();
 
-                                    match server.msg_processor.process(&server, &mut data.to_vec()) {
+                                    match server.msg_processor.process(&server, &mut data) {
                                         Ok(resp) => {
                                             debug!("iso_response : {} \n parsed :\n --- {} \n --- \n", get_hexdump(&resp.0), resp.1);
                                             match server.mli.create(&(resp.0).len()) {
@@ -148,7 +150,7 @@ fn new_client(iso_server: &ISOServer, stream_: TcpStream) {
                                         }
                                     }
 
-                                    in_buf.drain(0..mli as usize).for_each(drop);
+                                    //in_buf.drain(0..mli as usize).for_each(drop);
                                     mli = 0;
                                     reading_mli = true;
                                 }

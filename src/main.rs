@@ -4,6 +4,7 @@ extern crate lazy_static;
 #[macro_use]
 extern crate log;
 extern crate simplelog;
+extern crate bytes;
 
 use iso8583_rs::iso8583::IsoError;
 use iso8583_rs::iso8583::iso_spec::{IsoMsg, new_msg};
