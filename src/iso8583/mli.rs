@@ -34,18 +34,11 @@ pub struct MLI4I {}
 impl MLI for MLI2E {
     fn parse(&self, in_buf: &mut dyn Read) -> Result<u32, IsoError> {
         match in_buf.read_u16::<byteorder::BigEndian>() {
-            Ok(n) => Ok(n as u32),
+            Ok(n) => {
+                Ok(n as u32)
+            },
             Err(e) => Err(IsoError { msg: e.to_string() })
         }
-
-        /*let mut data: Vec<u8> = vec![0; 2];
-        match in_buf.read_exact(&mut data[..]) {
-            Ok(_) => {
-                let n = byteorder::BigEndian::read_u16(&mut data);
-                Ok(n as u32)
-            }
-            Err(e) => Err(IsoError { msg: e.to_string() })
-        }*/
     }
 
     fn create(&self, n: &usize) -> Result<Vec<u8>, IsoError> {

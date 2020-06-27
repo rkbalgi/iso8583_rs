@@ -1,5 +1,5 @@
 //! This module contains the implementation of a ISO server (TCP)
-use std::io::{Read, Write};
+use std::io::{Read, Write, BufReader, Cursor, Seek, SeekFrom, BufWriter};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::sync::Arc;
 use std::thread::JoinHandle;
@@ -8,8 +8,9 @@ use crate::iso8583::{IsoError};
 use crate::iso8583::iso_spec::{IsoMsg, Spec};
 use crate::iso8583::mli::{MLI, MLIType, MLI2E, MLI2I, MLI4E, MLI4I};
 use hexdump::hexdump_iter;
-use bytes::{BytesMut, Buf};
+use bytes::{BytesMut, Buf, BufMut};
 use bytes::buf::{BufExt, BufMutExt};
+use std::borrow::BorrowMut;
 
 
 /// This struct represents an error associated with server errors
@@ -100,71 +101,63 @@ fn new_client(iso_server: &ISOServer, stream_: TcpStream) {
     };
 
     std::thread::spawn(move || {
-        let mut buf = Vec::with_capacity(512);
         let mut stream = stream_;
         let mut reading_mli = true;
-        let mut in_buf = BytesMut::with_capacity(1024);
         let mut mli: u32 = 0;
 
+        let mut reader = BufReader::new(&stream);
+        let mut writer = BufWriter::new(&stream);
+
+        'done:
         loop {
-            match (&stream).read(&mut buf[..]) {
-                Ok(n) => {
-                    if n > 0 {
-                        trace!("read {} from {}", hex::encode(&buf[0..n]), stream.peer_addr().unwrap().to_string());
-                        in_buf.extend_from_slice(&buf[0..n]);
+            if reading_mli {
+                match server.mli.parse(&mut reader) {
+                    Ok(n) => {
+                        mli = n;
 
-                        while in_buf.len() > 0 {
-                            if reading_mli {
-                                match server.mli.parse(&mut in_buf) {
-                                    Ok(n) => {
+                        reading_mli = false;
+                    }
+                    Err(e) => {
+                        error!("client socket_err: {} {}", stream.peer_addr().unwrap().to_string(), e.msg);
+                        break 'done;
+                    }
+                };
+            } else {
+                if mli > 0 {
+                    let mut data = vec![0; mli as usize];
+                    match reader.read_exact(&mut data[..]) {
+                        Err(e) => {
+                            error!("client socket_err: {} {}", stream.peer_addr().unwrap().to_string(), e.to_string());
+                            break 'done;
+                        }
+                        _ => (),
+                    };
 
-                                        mli = n;
-                                        reading_mli = false;
-                                    }
-                                    Err(_e) => {}
+
+                    debug!("received request: \n{}\n len = {}", get_hexdump(&data), mli);
+                    let t1 = std::time::Instant::now();
+
+                    match server.msg_processor.process(&server, &mut data) {
+                        Ok(resp) => {
+                            debug!("iso_response : {} \n parsed :\n --- {} \n --- \n", get_hexdump(&resp.0), resp.1);
+                            match server.mli.create(&(resp.0).len()) {
+                                Ok(mut resp_data) => {
+                                    debug!("request processing time = {} millis", std::time::Instant::now().duration_since(t1).as_millis());
+                                    (&mut resp_data).write_all(resp.0.as_slice()).unwrap();
+                                    &writer.write_all(resp_data.as_slice()).unwrap();
+                                    &writer.flush();
                                 }
-                            } else {
-                                //reading data
-                                if mli > 0 && in_buf.len() >= mli as usize {
-                                    //let mut data = vec![0; mli as usize];
-                                    let mut data = Vec::from(in_buf.take(mli as usize).bytes());
-                                    debug!("received request: \n{}\n len = {}", get_hexdump(&data), mli);
-                                    let t1 = std::time::Instant::now();
-
-                                    match server.msg_processor.process(&server, &mut data) {
-                                        Ok(resp) => {
-                                            debug!("iso_response : {} \n parsed :\n --- {} \n --- \n", get_hexdump(&resp.0), resp.1);
-                                            match server.mli.create(&(resp.0).len()) {
-                                                Ok(mut resp_data) => {
-                                                    debug!("request processing time = {} millis", std::time::Instant::now().duration_since(t1).as_millis());
-                                                    (&mut resp_data).write_all(resp.0.as_slice()).unwrap();
-                                                    stream.write_all(resp_data.as_slice()).unwrap();
-                                                }
-                                                Err(e) => {
-                                                    error!("failed to construct mli {}", e.msg)
-                                                }
-                                            }
-                                        }
-                                        Err(e) => {
-                                            error!("failed to handle incoming req - {}", e.msg)
-                                        }
-                                    }
-
-                                    //in_buf.drain(0..mli as usize).for_each(drop);
-                                    mli = 0;
-                                    reading_mli = true;
+                                Err(e) => {
+                                    error!("failed to construct mli {}", e.msg)
                                 }
                             }
                         }
-                    } else {
-                        //socket may have been closed??
-                        info!("client socket closed : {}", stream.peer_addr().unwrap().to_string());
-                        return;
+                        Err(e) => {
+                            error!("failed to handle incoming req - {}", e.msg)
+                        }
                     }
-                }
-                Err(e) => {
-                    error!("client socket_err: {} {}", stream.peer_addr().unwrap().to_string(), e.to_string());
-                    return;
+                    mli = 0;
+                    reading_mli = true;
                 }
             }
         }

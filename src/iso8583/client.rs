@@ -66,13 +66,14 @@ impl ISOTcpClient {
             }
         }
 
-        let client = (self._tcp_stream.as_mut()).unwrap();
+        let mut client = self._tcp_stream.as_mut().unwrap();
 
         client.write_all(raw_msg.as_slice()).unwrap();
+        client.flush();
 
         // read the response
         let len: u32;
-        match self.mli.parse(client.borrow_mut()) {
+        match self.mli.parse(client) {
             Ok(n) => len = n,
             Err(e) => return Err(e)
         };
