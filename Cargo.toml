@@ -21,4 +21,3 @@ serde = { version = "1.0.113", features = ["derive"] }
 serde_yaml = "0.8.13"
 encoding8 = "0.3.2"
 hexdump = "0.1.0"
-bytes = "0.5.5"

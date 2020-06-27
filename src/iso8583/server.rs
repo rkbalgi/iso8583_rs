@@ -1,17 +1,14 @@
 //! This module contains the implementation of a ISO server (TCP)
-use std::io::{Read, Write, BufReader, Cursor, Seek, SeekFrom, BufWriter};
+use std::io::{BufReader, BufWriter, Read, Write};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::sync::Arc;
 use std::thread::JoinHandle;
 
-use crate::iso8583::{IsoError};
-use crate::iso8583::iso_spec::{IsoMsg, Spec};
-use crate::iso8583::mli::{MLI, MLIType, MLI2E, MLI2I, MLI4E, MLI4I};
 use hexdump::hexdump_iter;
-use bytes::{BytesMut, Buf, BufMut};
-use bytes::buf::{BufExt, BufMutExt};
-use std::borrow::BorrowMut;
 
+use crate::iso8583::IsoError;
+use crate::iso8583::iso_spec::{IsoMsg, Spec};
+use crate::iso8583::mli::{MLI, MLI2E, MLI2I, MLI4E, MLI4I, MLIType};
 
 /// This struct represents an error associated with server errors
 pub struct IsoServerError {
@@ -101,7 +98,7 @@ fn new_client(iso_server: &ISOServer, stream_: TcpStream) {
     };
 
     std::thread::spawn(move || {
-        let mut stream = stream_;
+        let stream = stream_;
         let mut reading_mli = true;
         let mut mli: u32 = 0;
 

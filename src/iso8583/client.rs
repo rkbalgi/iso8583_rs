@@ -6,7 +6,6 @@ use std::net::TcpStream;
 use crate::iso8583::mli::{MLI, MLIType, MLI2E, MLI2I, MLI4E, MLI4I};
 use std::io::{Write, Read};
 use crate::iso8583::server::get_hexdump;
-use std::borrow::BorrowMut;
 
 
 /// This struct represents a ISO8583 TCP client
@@ -66,10 +65,10 @@ impl ISOTcpClient {
             }
         }
 
-        let mut client = self._tcp_stream.as_mut().unwrap();
+        let client = self._tcp_stream.as_mut().unwrap();
 
         client.write_all(raw_msg.as_slice()).unwrap();
-        client.flush();
+        client.flush().unwrap();
 
         // read the response
         let len: u32;

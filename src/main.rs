@@ -4,14 +4,12 @@ extern crate lazy_static;
 #[macro_use]
 extern crate log;
 extern crate simplelog;
-extern crate bytes;
 
-use iso8583_rs::iso8583::IsoError;
 use iso8583_rs::iso8583::iso_spec::{IsoMsg, new_msg};
+use iso8583_rs::iso8583::IsoError;
+use iso8583_rs::iso8583::mli::MLIType::MLI2E;
 use iso8583_rs::iso8583::server::ISOServer;
 use iso8583_rs::iso8583::server::MsgProcessor;
-use iso8583_rs::iso8583::mli::MLIType::MLI2E;
-
 
 // Below is an example implementation of a MsgProcessor i.e the entity responsible for handling incoming messages
 // at the server
