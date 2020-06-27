@@ -111,7 +111,6 @@ fn new_client(iso_server: &ISOServer, stream_: TcpStream) {
                 match server.mli.parse(&mut reader) {
                     Ok(n) => {
                         mli = n;
-
                         reading_mli = false;
                     }
                     Err(e) => {
@@ -129,7 +128,6 @@ fn new_client(iso_server: &ISOServer, stream_: TcpStream) {
                         }
                         _ => (),
                     };
-
 
                     debug!("received request: \n{}\n len = {}", get_hexdump(&data), mli);
                     let t1 = std::time::Instant::now();
