@@ -5,6 +5,7 @@ mod tests {
     use crate::iso8583::mli::MLIType::MLI2E;
 
     #[test]
+    #[ignore]
     fn test_send_recv_iso_1100() -> Result<(), IsoError> {
         std::env::set_var("SPEC_FILE", "sample_spec/sample_spec.yaml");
 
@@ -42,6 +43,7 @@ mod tests {
 
 
     #[test]
+    #[ignore]
     fn test_send_recv_iso_1420() -> Result<(), IsoError> {
         std::env::set_var("SPEC_FILE", "sample_spec/sample_spec.yaml");
 

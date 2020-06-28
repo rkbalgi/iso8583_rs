@@ -96,14 +96,70 @@ impl MLI for MLI4I {
 }
 
 
+#[cfg(test)]
 mod tests {
-    #[test]
-    fn test_2e() {}
-    #[test]
-    fn test_2i() {}
-    #[test]
-    fn test_4e() {}
-    #[test]
-    fn test_4i() {}
+    use byteorder::WriteBytesExt;
+    use crate::iso8583::mli::{MLI2E, MLI4E, MLI2I, MLI4I};
+    use crate::iso8583::mli::MLI;
+    use std::io::{BufReader, Cursor};
 
+    #[test]
+    fn test_2e() {
+        let msg = "hello world";
+        let mut data: Vec<u8> = vec![];
+        data.write_u16::<byteorder::BigEndian>(msg.len() as u16);
+        data.extend_from_slice(msg.as_bytes());
+
+
+        let mli: &dyn MLI = &MLI2E {};
+        assert_eq!(mli.parse(&mut Cursor::new(data)).unwrap(), 11 as u32);
+        assert_eq!(mli.create(&(msg.len() as usize)).unwrap(), vec![0 as u8, 0x0b as u8]);
+    }
+
+    #[test]
+    fn test_2i() {
+        let msg = "hello world";
+        let mut data: Vec<u8> = vec![];
+        data.write_u16::<byteorder::BigEndian>((msg.len() + 2) as u16);
+        data.extend_from_slice(msg.as_bytes());
+
+
+        let mli: &dyn MLI = &MLI2I {};
+        assert_eq!(mli.parse(&mut Cursor::new(data)).unwrap(), 11 as u32);
+        assert_eq!(mli.create(&(msg.len() as usize)).unwrap(), vec![0 as u8, 0x0d as u8]);
+    }
+
+    #[test]
+    fn test_4e() {
+        let mut msg = String::new();
+        for _ in 0..257 {
+            msg.push('a');
+        }
+        let mut data: Vec<u8> = vec![];
+        data.write_u32::<byteorder::BigEndian>(msg.len() as u32);
+        data.extend_from_slice(msg.as_bytes());
+
+
+        let mli: &dyn MLI = &MLI4E {};
+        assert_eq!(mli.parse(&mut Cursor::new(data)).unwrap(), 257 as u32);
+        assert_eq!(mli.create(&(msg.len() as usize)).unwrap(), vec![0x00, 0x00, 0x01 as u8, 0x01 as u8]);
+    }
+
+    #[test]
+    fn test_4i() {
+
+        let mut msg = String::new();
+        for _ in 0..257 {
+            msg.push('a');
+        }
+        let mut data: Vec<u8> = vec![];
+        data.write_u32::<byteorder::BigEndian>((msg.len()+4) as u32);
+        data.extend_from_slice(msg.as_bytes());
+
+
+        let mli: &dyn MLI = &MLI4I {};
+        assert_eq!(mli.parse(&mut Cursor::new(data)).unwrap(), 257 as u32);
+        assert_eq!(mli.create(&(msg.len() as usize)).unwrap(), vec![0x00, 0x00, 0x01 as u8, 0x05 as u8]);
+
+    }
 }

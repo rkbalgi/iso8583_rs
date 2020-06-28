@@ -133,7 +133,7 @@ pub fn read_spec(spec_file: &str) -> Result<Spec, IsoError> {
 
 #[test]
 fn test_deserialize_yaml_spec() {
-    match read_spec("src\\iso8583\\sample_spec.yaml") {
+    match read_spec("sample_spec\\sample_spec.yaml") {
         Ok(spec) => {
             assert_eq!(2, (&spec.messages).len());
         }

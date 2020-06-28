@@ -103,20 +103,29 @@ impl Bitmap {
     }
 }
 
-#[test]
-fn test_bmp() {
-    let mut bmp = Bitmap::new(0, 0, 0);
-    bmp.set_on(4);
-    bmp.set_on(11);
-    bmp.set_on(64);
-    bmp.set_on(99);
-    bmp.set_on(133);
-    bmp.set_on(6);
+#[cfg(test)]
+mod tests {
+    use crate::iso8583::bitmap::Bitmap;
 
-    for i in 1..193 {
-        if bmp.is_on(i) {
-            println!("{} is on ", i)
-        }
+    #[test]
+    fn test_bmp() {
+        let mut bmp = Bitmap::new(0, 0, 0);
+
+        bmp.set_on(4);
+        bmp.set_on(11);
+        bmp.set_on(64);
+        bmp.set_on(99);
+        bmp.set_on(133);
+        bmp.set_on(6);
+
+        assert_eq!(bmp.is_on(4), true);
+        assert_ne!(bmp.is_on(5), true);
+
+        assert_eq!(bmp.is_on(11), true);
+        assert_eq!(bmp.is_on(64), true);
+        assert_eq!(bmp.is_on(99), true);
+        assert_eq!(bmp.is_on(133), true);
+        assert_eq!(bmp.is_on(6), true);
     }
 }
 
