@@ -5,22 +5,24 @@ ISO8583 library written in Rust
 
 __Early days., No promise of backward compatibility for v0.1.* :)__
 
-* Define a new specification in a YAML file
-* Define and start a ISO8583 server baseed on the spec
+* Define a ISO specification in a YAML file
 * Define a message-processor that can "act" on an incoming message and generate a response
+* Start a ISO8583 server based on the spec and the message-processor (see example below)
 * Use a TCP client to invoke the ISO server
 * A sample spec is defined in [sample_spec.yaml](sample_spec/sample_spec.yaml)
-* An ENV variable **SPEC_FILE** defines the location of the yaml spec definition file 
+* An ENV variable **SPEC_FILE** defines the location of the YAML spec definition file 
 * Supports ASCII, EBCDIC, BINARY/BCD encoding
 
 ## Notes
 
 Each spec defines a set of header fields (typically the MTI or Message Type), followed by any number
 of messages (auth/reversal etc). 
+
 For each incoming request (buffer), the header fields are parsed. The value of the parsed header field is matched against the selector
-defined on the message. On successful match, the incoming data is parsed against the message. Once parsed,
-the message is fed into the MsgProcessor defined on the server. The MsgProcessor applies its logic and generates a 
-response which is sent back to the client.   
+defined on the message. 
+
+On successful match, the incoming data is parsed against the message. Once parsed, the message is fed into the MsgProcessor
+defined on the server. The MsgProcessor applies its logic and generates a response which is sent back to the client.   
 
 
 ## Usage: 
