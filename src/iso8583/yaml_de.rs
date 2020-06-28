@@ -6,6 +6,8 @@ use crate::iso8583::bitmap::BmpField;
 use crate::iso8583::field::{Encoding, Field, FixedField, VarField};
 use crate::iso8583::iso_spec::{MessageSegment, Spec};
 use crate::iso8583::IsoError;
+use std::env::join_paths;
+use std::path::Path;
 
 #[derive(Serialize, Deserialize)]
 pub struct YField {
@@ -131,12 +133,22 @@ pub fn read_spec(spec_file: &str) -> Result<Spec, IsoError> {
 }
 
 
-#[test]
-fn test_deserialize_yaml_spec() {
-    match read_spec("sample_spec\\sample_spec.yaml") {
-        Ok(spec) => {
-            assert_eq!(2, (&spec.messages).len());
-        }
-        Err(e) => assert!(false, e)
+#[cfg(test)]
+mod tests {
+    use crate::iso8583::yaml_de::read_spec;
+    use std::path::Path;
+
+    #[test]
+    fn test_deserialize_yaml_spec() {
+        let path = Path::new(".").join("sample_spec").join("sample_spec.yaml");
+
+
+        println!("path is {}", path.to_str().unwrap());
+        match read_spec(path.to_str().unwrap()) {
+            Ok(spec) => {
+                assert_eq!(2, (&spec.messages).len());
+            }
+            Err(e) => assert!(false, e)
+        };
     }
 }
