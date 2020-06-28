@@ -1,5 +1,5 @@
 //! This module contains the implementation of a ISO server (TCP)
-use std::io::{BufReader, BufWriter, Read, Write};
+use std::io::{BufReader, Read, Write};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::sync::Arc;
 use std::thread::JoinHandle;
@@ -103,7 +103,7 @@ fn new_client(iso_server: &ISOServer, stream_: TcpStream) {
         let mut mli: u32 = 0;
 
         let mut reader = BufReader::new(&stream);
-        let mut writer = BufWriter::new(&stream);
+        let mut writer: Box<dyn Write> = Box::new(&stream);
 
         'done:
         loop {
@@ -114,7 +114,7 @@ fn new_client(iso_server: &ISOServer, stream_: TcpStream) {
                         reading_mli = false;
                     }
                     Err(e) => {
-                        error!("client socket_err: {} {}", stream.peer_addr().unwrap().to_string(), e.msg);
+                        error!("client socket_err: {} {}", &stream.peer_addr().unwrap().to_string(), e.msg);
                         break 'done;
                     }
                 };
@@ -139,8 +139,8 @@ fn new_client(iso_server: &ISOServer, stream_: TcpStream) {
                                 Ok(mut resp_data) => {
                                     debug!("request processing time = {} millis", std::time::Instant::now().duration_since(t1).as_millis());
                                     (&mut resp_data).write_all(resp.0.as_slice()).unwrap();
-                                    &writer.write_all(resp_data.as_slice()).unwrap();
-                                    &writer.flush();
+                                    writer.write_all(resp_data.as_slice()).unwrap();
+                                    writer.flush().unwrap();
                                 }
                                 Err(e) => {
                                     error!("failed to construct mli {}", e.msg)

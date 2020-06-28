@@ -36,7 +36,7 @@ impl MLI for MLI2E {
         match in_buf.read_u16::<byteorder::BigEndian>() {
             Ok(n) => {
                 Ok(n as u32)
-            },
+            }
             Err(e) => Err(IsoError { msg: e.to_string() })
         }
     }
@@ -93,4 +93,17 @@ impl MLI for MLI4I {
         let _ = mli.write_u32::<byteorder::BigEndian>((n.clone() as u32) + 4);
         Ok(mli)
     }
+}
+
+
+mod tests {
+    #[test]
+    fn test_2e() {}
+    #[test]
+    fn test_2i() {}
+    #[test]
+    fn test_4e() {}
+    #[test]
+    fn test_4i() {}
+
 }

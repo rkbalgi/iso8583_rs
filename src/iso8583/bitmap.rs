@@ -30,7 +30,6 @@ impl Bitmap {
 
     // Create a Bitmap from a Vec<u8>
     pub fn from_vec(bmp_data: &Vec<u8>) -> Bitmap {
-        println!("{}", bmp_data.len());
         assert!(bmp_data.len() >= 8 && bmp_data.len() <= 24);
         let mut b1: u64 = 0;
         let mut b2: u64 = 0;
