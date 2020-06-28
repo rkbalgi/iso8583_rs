@@ -6,8 +6,6 @@ use crate::iso8583::bitmap::BmpField;
 use crate::iso8583::field::{Encoding, Field, FixedField, VarField};
 use crate::iso8583::iso_spec::{MessageSegment, Spec};
 use crate::iso8583::IsoError;
-use std::env::join_paths;
-use std::path::Path;
 
 #[derive(Serialize, Deserialize)]
 pub struct YField {

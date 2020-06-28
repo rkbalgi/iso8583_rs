@@ -2,6 +2,7 @@
 ISO8583 library written in Rust 
 
 ![Crates.io](https://img.shields.io/crates/d/iso8583_rs?style=flat-square)
+[![Build Status](https://travis-ci.org/rkbalgi/iso8583_rs.svg?branch=master)](https://travis-ci.org/rkbalgi/iso8583_rs)
 
 __Early days., No promise of backward compatibility for v0.1.* :)__
 
