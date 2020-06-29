@@ -92,6 +92,7 @@ fn handle_1100(iso_msg: &IsoMsg, iso_resp_msg: &mut IsoMsg) -> Result<(), IsoErr
                     }
 
                     iso_resp_msg.set_on(63, "007").unwrap_or_default();
+                    iso_resp_msg.set_on(160, "F160").unwrap_or_default();
                 }
                 Err(_e) => {
                     iso_resp_msg.set_on(39, "107").unwrap_or_default();

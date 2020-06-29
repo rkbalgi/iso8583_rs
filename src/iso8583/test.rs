@@ -21,7 +21,7 @@ mod tests {
         iso_msg.set_on(11, "779581").unwrap();
         iso_msg.set_on(14, "2204").unwrap();
         iso_msg.set_on(19, "840").unwrap();
-        iso_msg.set_on(52, "0102030405060708").unwrap();
+        iso_msg.set_on(52, "0102030405060708").unwrap(); //binary field are represented in their hex encoded format
         iso_msg.set_on(61, "reserved_1").unwrap();
         iso_msg.set_on(62, "reserved-2").unwrap();
         iso_msg.set_on(63, "87877622525").unwrap();
