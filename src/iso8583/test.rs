@@ -52,6 +52,7 @@ mod tests {
 
         let mut client = ISOTcpClient::new("localhost:6666", &spec, MLI2E);
 
+        //send 10 messages
         for _ in 1..10 {
             let mut iso_msg = iso_spec::new_msg(spec, msg_seg);
 

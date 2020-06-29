@@ -62,54 +62,58 @@ impl MsgProcessor for SampleMsgProcessor {
 
 
 // Handle the incoming 1100 message based on amount
+// if amount (F4) <100 then
+//   F38 = APPR01;
+//   F39 = 000;
+// else
+//   F39 = 100;
+//
+//
 fn handle_1100(iso_msg: &IsoMsg, iso_resp_msg: &mut IsoMsg) -> Result<(), IsoError> {
+    iso_resp_msg.set("message_type", "1110").unwrap_or_default();
 
-    // process the incoming request based on amount
-    match iso_msg.bmp_child_value(4) {
-        Ok(amt) => {
-            iso_resp_msg.set("message_type", "1110").unwrap_or_default();
-
-            match amt.parse::<u32>() {
-                Ok(i_amt) => {
-                    debug!("amount = {}", i_amt);
-                    if i_amt < 100 {
-                        iso_resp_msg.set_on(38, "APPR01").unwrap_or_default();
-                        iso_resp_msg.set_on(39, "000").unwrap_or_default();
-                    } else {
-                        iso_resp_msg.set_on(39, "100").unwrap_or_default();
-                    }
-
-                    if iso_msg.bmp.is_on(61) {
-                        let mut val = iso_msg.bmp_child_value(61).unwrap();
-                        val += "-OK";
-                        iso_resp_msg.set_on(61, val.as_str()).unwrap();
-                    }
-
-                    if iso_msg.bmp.is_on(62) {
-                        let mut val = iso_msg.bmp_child_value(62).unwrap();
-                        val += "-OK";
-                        iso_resp_msg.set_on(62, val.as_str()).unwrap();
-                    }
-
-                    iso_resp_msg.set_on(63, "007").unwrap_or_default();
-                    iso_resp_msg.set_on(160, "F160").unwrap_or_default();
+    if !iso_msg.bmp.is_on(4) {
+        error!("No amount in request, responding with F39 = 115.");
+        iso_resp_msg.set("message_type", "1110").unwrap_or_default();
+        iso_resp_msg.set_on(39, "115").unwrap_or_default();
+        iso_resp_msg.echo_from(&iso_msg, &[2, 3, 4, 11, 14, 19, 96])
+    } else {
+        // process the incoming request based on amount
+        let amt = iso_msg.bmp_child_value(4).unwrap();
+        match amt.parse::<u32>() {
+            Ok(i_amt) => {
+                debug!("amount = {}", i_amt);
+                if i_amt < 100 {
+                    iso_resp_msg.set_on(38, "APPR01").unwrap_or_default();
+                    iso_resp_msg.set_on(39, "000").unwrap_or_default();
+                } else {
+                    iso_resp_msg.set_on(39, "100").unwrap_or_default();
                 }
-                Err(_e) => {
-                    iso_resp_msg.set_on(39, "107").unwrap_or_default();
+
+                if iso_msg.bmp.is_on(61) {
+                    let mut val = iso_msg.bmp_child_value(61).unwrap();
+                    val += "-OK";
+                    iso_resp_msg.set_on(61, val.as_str()).unwrap();
                 }
-            };
 
-            iso_resp_msg.echo_from(&iso_msg, &[2, 3, 4, 11, 14, 19, 96])?;
-            iso_resp_msg.fd_map.insert("bitmap".to_string(), iso_resp_msg.bmp.as_vec());
+                if iso_msg.bmp.is_on(62) {
+                    let mut val = iso_msg.bmp_child_value(62).unwrap();
+                    val += "-OK";
+                    iso_resp_msg.set_on(62, val.as_str()).unwrap();
+                }
 
-            Ok(())
-        }
-        Err(e) => {
-            error!("No amount in request, responding with 115. error = {}", e.msg);
-            iso_resp_msg.set("message_type", "1110").unwrap_or_default();
-            iso_resp_msg.set_on(39, "115").unwrap_or_default();
-            iso_resp_msg.echo_from(&iso_msg, &[2, 3, 4, 11, 14, 19, 96])
-        }
+                iso_resp_msg.set_on(63, "007").unwrap_or_default();
+                iso_resp_msg.set_on(160, "F160").unwrap_or_default();
+            }
+            Err(_e) => {
+                iso_resp_msg.set_on(39, "107").unwrap_or_default();
+            }
+        };
+
+        iso_resp_msg.echo_from(&iso_msg, &[2, 3, 4, 11, 14, 19, 96])?;
+        iso_resp_msg.fd_map.insert("bitmap".to_string(), iso_resp_msg.bmp.as_vec());
+
+        Ok(())
     }
 }
 
