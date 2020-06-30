@@ -20,21 +20,18 @@ pub struct PinError {
     msg: String
 }
 
-pub fn generate_pin_block<'a>(fmt: &'a PinFormat, c_pin: &str, pan: &str, key: &str) -> Result<Vec<u8>, PinError> {
+pub fn generate_pin_block(fmt: &PinFormat, c_pin: &str, pan: &str, key: &str) -> Result<Vec<u8>, PinError> {
     match fmt {
         ISO0 => {
-            let mut tmp = format!("0{}{}", c_pin.len(), c_pin);
-            pad_8(&mut tmp);
-            println!("with padding {}", tmp);
+            let mut b1 = format!("0{}{}", c_pin.len(), c_pin);
+            pad_8(&mut b1);
 
             //rightmost 12 not including check digit
-            let mut tmp2 = String::from("0000");
-            tmp2.push_str(&pan[pan.len() - 13..pan.len() - 1]);
+            let mut b2 = String::from("0000");
+            b2.push_str(&pan[pan.len() - 13..pan.len() - 1]);
 
-            let res = hex::decode(tmp).unwrap().iter().zip(hex::decode(tmp2).unwrap().iter()).map(|f| f.0 ^ f.1).collect::<Vec<u8>>();
+            let res = xor_hexstr(b1.as_str(), b2.as_str());
 
-
-            println!("res {}", hex::encode(res.as_slice()));
             let block_cipher = des::TdesEde2::new(GenericArray::from_slice(hex::decode(key).unwrap().as_slice()));
             let mut inp_block = GenericArray::clone_from_slice(res.as_slice());
             block_cipher.encrypt_block(&mut inp_block);
@@ -46,8 +43,16 @@ pub fn generate_pin_block<'a>(fmt: &'a PinFormat, c_pin: &str, pan: &str, key: &
     }
 }
 
+fn xor_hexstr(b1: &str, b2: &str) -> Vec<u8> {
+    assert_eq!(b1.len(), b2.len());
+    hex::decode(b1).unwrap().iter().
+        zip(hex::decode(b2).
+            unwrap().iter()).
+        map(|f| f.0 ^ f.1).collect::<Vec<u8>>()
+}
 
-//pad the hex string 'data' to be full 8 bytes
+
+//pad a random hex string 'data' to make it 8 bytes
 fn pad_8(data: &mut String) {
     let mut padding: [u8; 8] = rand::thread_rng().gen();
     //data.push_str(hex::encode(padding).as_str());
