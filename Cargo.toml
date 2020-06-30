@@ -21,3 +21,6 @@ serde = { version = "1.0.113", features = ["derive"] }
 serde_yaml = "0.8.13"
 encoding8 = "0.3.2"
 hexdump = "0.1.0"
+rand = "0.7.3"
+des = "0.4.0"
+generic-array = "0.14.2"
