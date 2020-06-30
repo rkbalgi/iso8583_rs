@@ -8,8 +8,8 @@ use des::block_cipher::BlockCipher;
 
 #[derive(Debug)]
 pub enum PinFormat {
-    ISO0,
     //ANSI X9.8, ECI-4
+    ISO0,
     ISO1,
     ISO2,
     ISO3,
@@ -31,11 +31,9 @@ pub fn generate_pin_block(fmt: &PinFormat, c_pin: &str, pan: &str, key: &str) ->
             b2.push_str(&pan[pan.len() - 13..pan.len() - 1]);
 
             let res = xor_hexstr(b1.as_str(), b2.as_str());
+            let res = des_ede2_encrypt(&res, &hex::decode(key).unwrap().to_vec());
 
-            let block_cipher = des::TdesEde2::new(GenericArray::from_slice(hex::decode(key).unwrap().as_slice()));
-            let mut inp_block = GenericArray::clone_from_slice(res.as_slice());
-            block_cipher.encrypt_block(&mut inp_block);
-            Ok(inp_block.to_vec())
+            Ok(res.to_vec())
         }
         _ => {
             Err(PinError { msg: format!("{:?} is not supported yet.", fmt) })
@@ -43,6 +41,16 @@ pub fn generate_pin_block(fmt: &PinFormat, c_pin: &str, pan: &str, key: &str) ->
     }
 }
 
+fn des_ede2_encrypt(data: &Vec<u8>, key: &Vec<u8>) -> Vec<u8> {
+    let block_cipher = des::TdesEde2::new(GenericArray::from_slice(key.as_slice()));
+
+    let mut cp_data = data.clone();
+    block_cipher.encrypt_block(GenericArray::from_mut_slice(&mut cp_data));
+    cp_data
+}
+
+/// XOR the contents of 2 hex string (of equal lengths ofcourse) and return the result
+/// as a Vec<u8>
 fn xor_hexstr(b1: &str, b2: &str) -> Vec<u8> {
     assert_eq!(b1.len(), b2.len());
     hex::decode(b1).unwrap().iter().
@@ -52,7 +60,7 @@ fn xor_hexstr(b1: &str, b2: &str) -> Vec<u8> {
 }
 
 
-//pad a random hex string 'data' to make it 8 bytes
+/// Pad a random hex string 'data' to make it 8 bytes
 fn pad_8(data: &mut String) {
     let mut padding: [u8; 8] = rand::thread_rng().gen();
     //data.push_str(hex::encode(padding).as_str());
