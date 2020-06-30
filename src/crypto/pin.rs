@@ -49,7 +49,7 @@ fn des_ede2_encrypt(data: &Vec<u8>, key: &Vec<u8>) -> Vec<u8> {
     cp_data
 }
 
-/// XOR the contents of 2 hex string (of equal lengths ofcourse) and return the result
+/// XOR the contents of 2 hex string (of equal length) and return the result
 /// as a Vec<u8>
 fn xor_hexstr(b1: &str, b2: &str) -> Vec<u8> {
     assert_eq!(b1.len(), b2.len());
