@@ -27,8 +27,6 @@ static ref ALL_SPECS: std::collections::HashMap<String,Spec> ={
             None => panic!("SPEC_FILE env variable not defined!")
         }
 
-
-
     let mut specs=HashMap::<String,Spec>::new();
 
     match crate::iso8583::yaml_de::read_spec(spec_file.as_str()){
@@ -279,7 +277,7 @@ impl IsoMsg {
         Ok(out_buf)
     }
 
-    /// Sets F52 based on provided clear pin, and format/key provided via cfg
+    /// Sets F52 based on provided clear pin, and format, key provided via cfg
     pub fn set_pin(&mut self, pin: &str, pan: &str, cfg: &Config) -> Result<(), IsoError> {
 
         if cfg.get_pin_fmt().is_none() || cfg.get_pin_key().is_none() {

@@ -13,6 +13,7 @@ pub struct Config {
 
 
 impl Config {
+    // Creates a new empty Config
     pub fn new() -> Config {
         Config {
             pin_format: None,

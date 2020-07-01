@@ -50,7 +50,7 @@ impl MsgProcessor for SampleMsgProcessor {
                 match iso_resp_msg.assemble() {
                     Ok(resp_data) => Ok((resp_data, iso_resp_msg)),
                     Err(e) => {
-                        error!("Failed to assemble response message - {}", e.msg);
+                        error!("Failed to assemble response message, dropping message - {}", e.msg);
                         Err(IsoError { msg: format!("error: msg assembly failed..{} ", e.msg) })
                     }
                 }
@@ -100,8 +100,9 @@ fn handle_1100(iso_msg: &IsoMsg, iso_resp_msg: &mut IsoMsg) -> Result<(), IsoErr
                                      iso_msg.bmp_child_value(2).unwrap().as_str(), "e0f4543f3e2a2c5ffc7e5e5a222e3e4d") {
                         Ok(res) => {
                             if res {
-                                debug!("{}", "PIN verified OK!");
+                                debug!("{}", "PIN verified OK.");
                             } else {
+                                warn!("{}", "PIN verified Failed!!");
                                 iso_resp_msg.set_on(39, "117").unwrap_or_default();
                             }
                         }
