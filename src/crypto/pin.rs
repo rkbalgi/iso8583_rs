@@ -7,9 +7,7 @@ use super::rand::Rng;
 use generic_array::GenericArray;
 use des::block_cipher::NewBlockCipher;
 use des::block_cipher::BlockCipher;
-use std::process::exit;
 
-use odds::string::StrSlice;
 
 #[derive(Debug)]
 pub enum PinFormat {
@@ -22,7 +20,7 @@ pub enum PinFormat {
 }
 
 pub struct PinError {
-    msg: String
+    pub msg: String
 }
 
 pub fn generate_pin_block(fmt: &PinFormat, c_pin: &str, pan: &str, key: &str) -> Result<Vec<u8>, PinError> {
@@ -96,6 +94,7 @@ pub fn generate_pin_block(fmt: &PinFormat, c_pin: &str, pan: &str, key: &str) ->
 /// Verifies the pin in the 'pin_block' against expected_pin and returns a boolean to indicate if there was
 /// was a successful match
 pub fn verify_pin(fmt: &PinFormat, expected_pin: &str, pin_block: &Vec<u8>, pan: &str, key: &str) -> Result<bool, PinError> {
+    debug!("verifying pin - expected_pin: {},  block: {}, pan:{}, key:{}", expected_pin, hex::encode(pin_block), pan, key);
     match fmt {
         PinFormat::ISO0 => {
             let mut b2 = String::from("0000");
@@ -187,7 +186,7 @@ fn xor_hexstr(b1: &str, b2: &str) -> Vec<u8> {
 
 /// Pad a random hex string to'data' to make it 8 bytes
 fn pad_8(data: &mut String) {
-    let mut padding: [u8; 8] = rand::thread_rng().gen();
+    let padding: [u8; 8] = rand::thread_rng().gen();
     data.push_str(hex::encode(padding).as_str());
     data.truncate(16);
 }
@@ -252,7 +251,6 @@ mod tests {
     fn test_iso1() {
         match generate_pin_block(&ISO1, "8976", "4111111111111111", "e0f4543f3e2a2c5ffc7e5e5a222e3e4d") {
             Ok(p) => {
-
                 match verify_pin(&ISO1, "8976", &p, "4111111111111111", "e0f4543f3e2a2c5ffc7e5e5a222e3e4d") {
                     Ok(res) => {
                         assert_eq!(res, true)

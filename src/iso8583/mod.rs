@@ -6,6 +6,7 @@ pub mod server;
 mod test;
 mod yaml_de;
 pub mod mli;
+pub mod config;
 
 /// IsoError represents a generic error throughout this and dependent sub-modules
 #[derive(Debug)]
