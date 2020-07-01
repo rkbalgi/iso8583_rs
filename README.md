@@ -7,6 +7,11 @@ ISO8583 library written in Rust
 
 __Early days., No promise of backward compatibility for v0.1.* :)__
 
+## New in 0.1.7
+* Support for building PIN blocks (F52) in ISO0,ISO1,ISO2,ISO3 formats
+
+## Features
+
 * Define a ISO specification in a YAML file
 * Define a message-processor that can "act" on an incoming message and generate a response
 * Start a ISO8583 server based on the spec and the message-processor (see example below)
@@ -28,7 +33,9 @@ On successful match, the incoming data is parsed against the message. Once parse
 defined on the server. The MsgProcessor applies its logic and generates a response which is sent back to the client.   
 
 
-## Usage: 
+## Demo Application: 
+(from main.rs)
+
 ``` rust
 extern crate byteorder;
 extern crate hex;
