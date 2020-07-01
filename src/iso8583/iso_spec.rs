@@ -8,6 +8,8 @@ use crate::iso8583::{bitmap, IsoError};
 use crate::iso8583::field::{Field, ParseError};
 use crate::iso8583::yaml_de::YMessageSegment;
 use crate::iso8583::bitmap::Bitmap;
+use crate::iso8583::config::Config;
+use crate::crypto::pin::generate_pin_block;
 
 // Reads the spec definitions from YAML file
 lazy_static! {
@@ -24,8 +26,6 @@ static ref ALL_SPECS: std::collections::HashMap<String,Spec> ={
 
             None => panic!("SPEC_FILE env variable not defined!")
         }
-
-
 
     let mut specs=HashMap::<String,Spec>::new();
 
@@ -275,6 +275,23 @@ impl IsoMsg {
             }
         }
         Ok(out_buf)
+    }
+
+    /// Sets F52 based on provided clear pin, and format, key provided via cfg
+    pub fn set_pin(&mut self, pin: &str, pan: &str, cfg: &Config) -> Result<(), IsoError> {
+
+        if cfg.get_pin_fmt().is_none() || cfg.get_pin_key().is_none() {
+            return Err(IsoError { msg: format!("missing pin_format or key in call to set_pin") });
+        }
+
+        match generate_pin_block(&cfg.get_pin_fmt().as_ref().unwrap(), pin, pan, cfg.get_pin_key().as_ref().unwrap().as_str()) {
+            Ok(v) => {
+                self.set_on(52, hex::encode(v).as_str())
+            }
+            Err(e) => {
+                Err(IsoError { msg: e.msg })
+            }
+        }
     }
 }
 

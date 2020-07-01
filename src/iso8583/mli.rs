@@ -101,7 +101,7 @@ mod tests {
     use byteorder::WriteBytesExt;
     use crate::iso8583::mli::{MLI2E, MLI4E, MLI2I, MLI4I};
     use crate::iso8583::mli::MLI;
-    use std::io::{BufReader, Cursor};
+    use std::io::{Cursor};
 
     #[test]
     fn test_2e() {
