@@ -7,6 +7,7 @@ use super::rand::Rng;
 use generic_array::GenericArray;
 use des::block_cipher::NewBlockCipher;
 use des::block_cipher::BlockCipher;
+use crate::crypto::{des_ede2_decrypt, des_ede2_encrypt};
 
 
 #[derive(Debug)]
@@ -157,21 +158,7 @@ pub fn verify_pin(fmt: &PinFormat, expected_pin: &str, pin_block: &Vec<u8>, pan:
     }
 }
 
-fn des_ede2_encrypt(data: &Vec<u8>, key: &Vec<u8>) -> Vec<u8> {
-    let block_cipher = des::TdesEde2::new(GenericArray::from_slice(key.as_slice()));
 
-    let mut cp_data = data.clone();
-    block_cipher.encrypt_block(GenericArray::from_mut_slice(&mut cp_data));
-    cp_data
-}
-
-fn des_ede2_decrypt(data: &Vec<u8>, key: &Vec<u8>) -> Vec<u8> {
-    let block_cipher = des::TdesEde2::new(GenericArray::from_slice(key.as_slice()));
-
-    let mut cp_data = data.clone();
-    block_cipher.decrypt_block(GenericArray::from_mut_slice(&mut cp_data));
-    cp_data
-}
 
 /// XOR the contents of 2 hex string (of equal length) and return the result
 /// as a Vec<u8>
