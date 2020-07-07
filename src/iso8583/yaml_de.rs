@@ -140,7 +140,6 @@ mod tests {
     fn test_deserialize_yaml_spec() {
         let path = Path::new(".").join("sample_spec").join("sample_spec.yaml");
 
-
         println!("path is {}", path.to_str().unwrap());
         match read_spec(path.to_str().unwrap()) {
             Ok(spec) => {

@@ -4,9 +4,6 @@
 
 use rand;
 use super::rand::Rng;
-use generic_array::GenericArray;
-use des::block_cipher::NewBlockCipher;
-use des::block_cipher::BlockCipher;
 use crate::crypto::{tdes_ede2_decrypt, tdes_ede2_encrypt};
 
 

@@ -4,6 +4,8 @@ extern crate lazy_static;
 #[macro_use]
 extern crate log;
 extern crate simplelog;
+#[macro_use]
+extern crate hex_literal;
 
 use iso8583_rs::iso8583::iso_spec::{IsoMsg, new_msg};
 use iso8583_rs::iso8583::IsoError;
@@ -12,6 +14,11 @@ use iso8583_rs::iso8583::server::ISOServer;
 use iso8583_rs::iso8583::server::MsgProcessor;
 use iso8583_rs::crypto::pin::verify_pin;
 use iso8583_rs::crypto::pin::PinFormat::ISO0;
+use std::path::Path;
+use iso8583_rs::crypto::mac::MacAlgo::RetailMac;
+use iso8583_rs::crypto::mac::PaddingType::Type1;
+use iso8583_rs::crypto::mac::verify_mac;
+
 
 // Below is an example implementation of a MsgProcessor i.e the entity responsible for handling incoming messages
 // at the server
@@ -43,7 +50,7 @@ impl MsgProcessor for SampleMsgProcessor {
                     iso_resp_msg.echo_from(&iso_msg, &[2, 3, 4, 11, 14, 19, 96])?;
                     iso_resp_msg.set_on(39, "400").unwrap_or_default();
                 } else if req_msg_type == "1100" {
-                    handle_1100(&iso_msg, &mut iso_resp_msg)?
+                    handle_1100(&iso_msg, msg, &mut iso_resp_msg)?
                 }
 
 
@@ -71,8 +78,35 @@ impl MsgProcessor for SampleMsgProcessor {
 //   F39 = 100;
 //
 //
-fn handle_1100(iso_msg: &IsoMsg, iso_resp_msg: &mut IsoMsg) -> Result<(), IsoError> {
+fn handle_1100(iso_msg: &IsoMsg, raw_msg: &Vec<u8>, iso_resp_msg: &mut IsoMsg) -> Result<(), IsoError> {
     iso_resp_msg.set("message_type", "1110").unwrap_or_default();
+    //validate the mac
+    if iso_msg.bmp.is_on(64) || iso_msg.bmp.is_on(128) {
+
+        let key=hex!("e0f4543f3e2a2c5ffc7e5e5a222e3e4d").to_vec();
+        let expected_mac = match iso_msg.bmp.is_on(64) {
+            true => {
+                iso_msg.bmp_child_value(64)
+            }
+            false => {
+                iso_msg.bmp_child_value(128)
+            }
+        };
+        let mac_data=&raw_msg.as_slice()[0..raw_msg.len() - 8];
+        match verify_mac(&RetailMac, &Type1, mac_data, &key, &hex::decode(expected_mac.unwrap()).unwrap()) {
+            Ok(_) => {
+                debug!("mac verified OK!");
+            }
+            Err(e) => {
+                error!("failed to verify mac. Reason: {}", e.msg);
+                iso_resp_msg.set("message_type", "1110").unwrap_or_default();
+                iso_resp_msg.set_on(39, "916").unwrap_or_default();
+                iso_resp_msg.echo_from(&iso_msg, &[2, 3, 4, 11, 14, 19, 96]);
+                return Ok(());
+            }
+        }
+    }
+
 
     if !iso_msg.bmp.is_on(4) {
         error!("No amount in request, responding with F39 = 115 ");
@@ -148,7 +182,9 @@ fn handle_1100(iso_msg: &IsoMsg, iso_resp_msg: &mut IsoMsg) -> Result<(), IsoErr
 
 
 fn main() {
-    std::env::set_var("SPEC_FILE", "sample_spec\\sample_spec.yaml");
+    let path = Path::new(".").join("sample_spec").join("sample_spec.yaml");
+    let spec_file = path.to_str().unwrap();
+    std::env::set_var("SPEC_FILE", spec_file);
 
     let _ = simplelog::SimpleLogger::init(simplelog::LevelFilter::Debug, simplelog::Config::default());
 

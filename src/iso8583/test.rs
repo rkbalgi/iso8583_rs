@@ -5,11 +5,19 @@ mod tests {
     use crate::iso8583::mli::MLIType::MLI2E;
     use crate::crypto::pin::PinFormat::ISO0;
     use crate::iso8583::config::Config;
+    use crate::crypto::mac::MacAlgo::RetailMac;
+    use crate::crypto::mac::PaddingType::Type1;
+
+    use log;
+    use simplelog;
+    use std::env::join_paths;
+    use std::path::Path;
 
     #[test]
     #[ignore]
     fn test_send_recv_iso_1100() -> Result<(), IsoError> {
-        std::env::set_var("SPEC_FILE", "sample_spec/sample_spec.yaml");
+        let path = Path::new(".").join("sample_spec").join("sample_spec.yaml");
+        std::env::set_var("SPEC_FILE", path.to_str().unwrap());
 
         let spec = crate::iso8583::iso_spec::spec("");
         let msg_seg = spec.get_message_from_header("1100").unwrap();
@@ -26,9 +34,12 @@ mod tests {
         iso_msg.set_on(19, "840").unwrap();
 
 
-        //--------- set pin - F52
         let mut cfg = Config::new();
-        cfg.with_pin(ISO0, String::from("e0f4543f3e2a2c5ffc7e5e5a222e3e4d"));
+        cfg.with_pin(ISO0, String::from("e0f4543f3e2a2c5ffc7e5e5a222e3e4d"))
+            .with_mac(RetailMac, Type1, String::from("e0f4543f3e2a2c5ffc7e5e5a222e3e4d"));
+
+
+        //--------- set pin - F52
 
         //this will compute a pin based on cfg and the supplied pan and set bit position 52
         iso_msg.set_pin("1234", iso_msg.bmp_child_value(2).unwrap().as_str(), &cfg).unwrap();
@@ -42,7 +53,12 @@ mod tests {
         iso_msg.set_on(62, "reserved-2").unwrap();
         iso_msg.set_on(63, "87877622525").unwrap();
         iso_msg.set_on(96, "1234").unwrap();
-        iso_msg.set_on(160, "5678").unwrap();
+
+
+        //--------- set mac  - either F64 or F128
+        iso_msg.set_mac(&cfg);
+        //--------- set mac
+
 
         let mut client = ISOTcpClient::new("localhost:6666", &spec, MLI2E);
 
@@ -61,7 +77,9 @@ mod tests {
     #[test]
     #[ignore]
     fn test_send_recv_iso_1420() -> Result<(), IsoError> {
-        std::env::set_var("SPEC_FILE", "sample_spec/sample_spec.yaml");
+
+        let path = Path::new(".").join("sample_spec").join("sample_spec.yaml");
+        std::env::set_var("SPEC_FILE", path.to_str().unwrap());
 
         let spec = crate::iso8583::iso_spec::spec("");
         let msg_seg = spec.get_message_from_header("1420").unwrap();

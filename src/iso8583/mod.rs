@@ -1,3 +1,4 @@
+//! This module contains functions related to ISO8583 specifications, message, parsers etc
 pub mod client;
 pub mod bitmap;
 pub mod field;
@@ -10,6 +11,6 @@ pub mod config;
 
 /// IsoError represents a generic error throughout this and dependent sub-modules
 #[derive(Debug)]
-pub struct IsoError{
+pub struct IsoError {
     pub msg: String,
 }
