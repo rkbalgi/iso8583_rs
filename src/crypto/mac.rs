@@ -2,11 +2,15 @@
 
 //https://en.wikipedia.org/wiki/ISO/IEC_9797-1#Complete_specification_of_the_MAC_calculation
 
+use crate::crypto::{tdes_encrypt_cbc, des_encrypt_cbc};
+use hex_literal::hex;
+
 /// This enum defines various supported algorithms
 pub enum MacAlgo {
-    CBC_MAC,
     //ISO9797 - algo 1
-    RETAIL_MAC, // ISO9797 - algo 3
+    CBC_MAC,
+    // ISO9797 - algo 3
+    RETAIL_MAC,
 }
 
 /// This enum defines all supported padding types
@@ -21,9 +25,33 @@ pub struct MacError {
     pub msg: String
 }
 
-pub fn generate_mac(algo: MacAlgo, padding_type: PaddingType, data: &Vec<u8>) -> Result<Vec<u8>, MacError> {
+pub fn generate_mac(algo: MacAlgo, padding_type: PaddingType, data: &Vec<u8>, key: &Vec<u8>) -> Result<Vec<u8>, MacError> {
     let mut new_data = apply_padding(padding_type, data);
-    Ok(new_data)
+    let mut iv = Vec::<u8>::new();
+    iv.extend_from_slice(hex::decode("0000000000000000").unwrap().as_slice());
+
+    match algo {
+        MacAlgo::CBC_MAC => {
+            let res = tdes_encrypt_cbc(&new_data, key, &iv);
+            Ok(res[res.len() - 8..].to_vec())
+        }
+        MacAlgo::RETAIL_MAC => {
+            let k = key.as_slice()[0..8].to_vec();
+
+            //if there is a single block
+            if data.len() == 8 {
+                Ok(tdes_encrypt_cbc(&data, key, &iv))
+            } else {
+
+                //else, all but the last block DES and the last block TDES
+                let d1 = &new_data[0..new_data.len() - 8].to_vec();
+                let d2 = &new_data[new_data.len() - 8..].to_vec();
+
+                let res1 = des_encrypt_cbc(&d1, &k, &iv);
+                Ok(tdes_encrypt_cbc(&d2, key, &res1[(res1.len() - 8)..].to_vec()))
+            }
+        }
+    }
 }
 
 fn apply_padding(padding_type: PaddingType, data: &Vec<u8>) -> Vec<u8> {
@@ -49,29 +77,30 @@ fn apply_padding(padding_type: PaddingType, data: &Vec<u8>) -> Vec<u8> {
 
 #[cfg(test)]
 mod tests {
-    use crate::crypto::mac::{apply_padding, PaddingType};
+    use crate::crypto::mac::{apply_padding, PaddingType, generate_mac, MacAlgo};
+    use hex_literal::hex;
 
     #[test]
-    fn test_padding1_1() {
+    fn test_padding1_shortof8() {
         let data = hex::decode("0102030405").unwrap();
         assert_eq!(hex::encode(apply_padding(PaddingType::Type1, &data)), "0102030405000000");
     }
 
     #[test]
-    fn test_padding1_nopadding_reqd() {
+    fn test_padding1_exact() {
         let data = hex::decode("0102030405060708").unwrap();
         assert_eq!(hex::encode(apply_padding(PaddingType::Type1, &data)), "0102030405060708");
     }
 
     #[test]
-    fn test_padding1_2() {
+    fn test_padding1_typical_short() {
         let data = hex::decode("0102030405060708090a").unwrap();
         assert_eq!(hex::encode(apply_padding(PaddingType::Type1, &data)), "0102030405060708090a000000000000");
     }
 
 
     #[test]
-    fn test_padding2_1() {
+    fn test_padding2_shortof8() {
         let data = hex::decode("0102030405").unwrap();
         assert_eq!(hex::encode(apply_padding(PaddingType::Type2, &data)), "0102030405800000");
     }
@@ -83,8 +112,116 @@ mod tests {
     }
 
     #[test]
-    fn test_padding2_2() {
+    fn test_padding2_typical_short() {
         let data = hex::decode("0102030405060708090a").unwrap();
         assert_eq!(hex::encode(apply_padding(PaddingType::Type2, &data)), "0102030405060708090a800000000000");
+    }
+
+
+    #[test]
+    fn test_gen_mac_cbc_nopads() {
+        let res = generate_mac(MacAlgo::CBC_MAC, PaddingType::Type1,
+                               &Vec::from(hex!("0102030405060708")), &Vec::from(hex!("e0f4543f3e2a2c5ffc7e5e5a222e3e4d")));
+        match res {
+            Ok(m) => {
+                println!("mac = {}", hex::encode(m.as_slice()));
+                assert_eq!("7d34c3071da931b9", hex::encode(m));
+            }
+            Err(e) => {
+                assert!(false, e.msg)
+            }
+        }
+    }
+
+    #[test]
+    fn test_gen_mac_cbc_2() {
+        let res = generate_mac(MacAlgo::CBC_MAC, PaddingType::Type1,
+                               &Vec::from(hex!("01020304050607080102030405060708")), &Vec::from(hex!("e0f4543f3e2a2c5ffc7e5e5a222e3e4d")));
+        match res {
+            Ok(m) => {
+                println!("mac = {}", hex::encode(m.as_slice()));
+                assert_eq!("0fe28f4b5537ee79", hex::encode(m));
+            }
+            Err(e) => {
+                assert!(false, e.msg)
+            }
+        }
+    }
+
+
+    #[test]
+    fn test_gen_mac_cbc_3() {
+        let res = generate_mac(MacAlgo::CBC_MAC, PaddingType::Type1,
+                               &Vec::from(hex!("01020304050607080102030405")), &Vec::from(hex!("e0f4543f3e2a2c5ffc7e5e5a222e3e4d")));
+        match res {
+            Ok(m) => {
+                println!("mac = {}", hex::encode(m.as_slice()));
+                assert_eq!("8fb12963d5661a22", hex::encode(m));
+            }
+            Err(e) => {
+                assert!(false, e.msg)
+            }
+        }
+    }
+
+    #[test]
+    fn test_gen_mac_cbc_2_paddingtype2() {
+        let res = generate_mac(MacAlgo::CBC_MAC, PaddingType::Type2,
+                               &Vec::from(hex!("01020304050607080102030405")), &Vec::from(hex!("e0f4543f3e2a2c5ffc7e5e5a222e3e4d")));
+        match res {
+            Ok(m) => {
+                println!("mac = {}", hex::encode(m.as_slice()));
+                assert_eq!("8568cd2b7698605f", hex::encode(m));
+            }
+            Err(e) => {
+                assert!(false, e.msg)
+            }
+        }
+    }
+
+
+    #[test]
+    fn test_gen_mac_retail1_nopads() {
+        let res = generate_mac(MacAlgo::RETAIL_MAC, PaddingType::Type1,
+                               &Vec::from(hex!("0102030405060708")), &Vec::from(hex!("e0f4543f3e2a2c5ffc7e5e5a222e3e4d")));
+        match res {
+            Ok(m) => {
+                println!("mac = {}", hex::encode(m.as_slice()));
+                assert_eq!("7d34c3071da931b9", hex::encode(m));
+            }
+            Err(e) => {
+                assert!(false, e.msg)
+            }
+        }
+    }
+
+    #[test]
+    fn test_gen_mac_retail2_padtype1() {
+        let res = generate_mac(MacAlgo::RETAIL_MAC, PaddingType::Type1,
+                               &Vec::from(hex!("0102030405060708010203040506070801020304050607080000")), &Vec::from(hex!("e0f4543f3e2a2c5ffc7e5e5a222e3e4d")));
+        match res {
+            Ok(m) => {
+                println!("mac = {}", hex::encode(m.as_slice()));
+                assert_eq!(hex::encode(m), "149f99288681d292");
+            }
+            Err(e) => {
+                assert!(false, e.msg)
+            }
+        }
+    }
+
+    #[test]
+    fn test_gen_mac_retail_padtype2() {
+        let res = generate_mac(MacAlgo::RETAIL_MAC, PaddingType::Type2,
+                               &Vec::from(hex!("0102030405060708010203040506070801020304050607080000")), &Vec::from(hex!("e0f4543f3e2a2c5ffc7e5e5a222e3e4d")));
+        match res {
+            Ok(m) => {
+                println!("mac = {}", hex::encode(m.as_slice()));
+                assert_eq!(hex::encode(m), "4689dd5a87015394");
+            }
+            Err(e) => {
+                assert!(false, e.msg)
+            }
+        }
     }
 }

@@ -7,7 +7,7 @@ use super::rand::Rng;
 use generic_array::GenericArray;
 use des::block_cipher::NewBlockCipher;
 use des::block_cipher::BlockCipher;
-use crate::crypto::{des_ede2_decrypt, des_ede2_encrypt};
+use crate::crypto::{tdes_ede2_decrypt, tdes_ede2_encrypt};
 
 
 #[derive(Debug)]
@@ -36,7 +36,7 @@ pub fn generate_pin_block(fmt: &PinFormat, c_pin: &str, pan: &str, key: &str) ->
             b2.push_str(&pan[pan.len() - 13..pan.len() - 1]);
 
             let res = xor_hexstr(b1.as_str(), b2.as_str());
-            let res = des_ede2_encrypt(&res, &hex::decode(key).unwrap().to_vec());
+            let res = tdes_ede2_encrypt(&res, &hex::decode(key).unwrap().to_vec());
 
             Ok(res.to_vec())
         }
@@ -45,7 +45,7 @@ pub fn generate_pin_block(fmt: &PinFormat, c_pin: &str, pan: &str, key: &str) ->
             pad_8(&mut b1);
             match hex::decode(b1) {
                 Ok(res) => {
-                    let res = des_ede2_encrypt(&res, &hex::decode(key).unwrap().to_vec());
+                    let res = tdes_ede2_encrypt(&res, &hex::decode(key).unwrap().to_vec());
                     Ok(res)
                 }
                 Err(e) => {
@@ -62,7 +62,7 @@ pub fn generate_pin_block(fmt: &PinFormat, c_pin: &str, pan: &str, key: &str) ->
             println!("= {}", b1);
             match hex::decode(b1) {
                 Ok(res) => {
-                    let res = des_ede2_encrypt(&res, &hex::decode(key).unwrap().to_vec());
+                    let res = tdes_ede2_encrypt(&res, &hex::decode(key).unwrap().to_vec());
                     Ok(res)
                 }
                 Err(e) => {
@@ -81,7 +81,7 @@ pub fn generate_pin_block(fmt: &PinFormat, c_pin: &str, pan: &str, key: &str) ->
             b2.push_str(&pan[pan.len() - 13..pan.len() - 1]);
 
             let res = xor_hexstr(b1.as_str(), b2.as_str());
-            let res = des_ede2_encrypt(&res, &hex::decode(key).unwrap().to_vec());
+            let res = tdes_ede2_encrypt(&res, &hex::decode(key).unwrap().to_vec());
 
             Ok(res.to_vec())
         }
@@ -101,7 +101,7 @@ pub fn verify_pin(fmt: &PinFormat, expected_pin: &str, pin_block: &Vec<u8>, pan:
             let mut b2 = String::from("0000");
             b2.push_str(&pan[pan.len() - 13..pan.len() - 1]);
 
-            let res = des_ede2_decrypt(&pin_block, &hex::decode(key).unwrap().to_vec());
+            let res = tdes_ede2_decrypt(&pin_block, &hex::decode(key).unwrap().to_vec());
             let res = xor_hexstr(hex::encode(res.as_slice()).as_str(), b2.as_str());
             let pin_len = res.get(0).unwrap();
             let b1 = hex::encode(&res);
@@ -114,7 +114,7 @@ pub fn verify_pin(fmt: &PinFormat, expected_pin: &str, pin_block: &Vec<u8>, pan:
         }
 
         PinFormat::ISO1 => {
-            let res = des_ede2_decrypt(&pin_block, &hex::decode(key).unwrap().to_vec());
+            let res = tdes_ede2_decrypt(&pin_block, &hex::decode(key).unwrap().to_vec());
 
             let pin_len = res.get(0).unwrap();
             let b1 = hex::encode(&res);
@@ -126,7 +126,7 @@ pub fn verify_pin(fmt: &PinFormat, expected_pin: &str, pin_block: &Vec<u8>, pan:
             }
         }
         PinFormat::ISO2 => {
-            let res = des_ede2_decrypt(&pin_block, &hex::decode(key).unwrap().to_vec());
+            let res = tdes_ede2_decrypt(&pin_block, &hex::decode(key).unwrap().to_vec());
 
             let pin_len = res.get(0).unwrap();
             let b1 = hex::encode(&res);
@@ -141,7 +141,7 @@ pub fn verify_pin(fmt: &PinFormat, expected_pin: &str, pin_block: &Vec<u8>, pan:
             let mut b2 = String::from("0000");
             b2.push_str(&pan[pan.len() - 13..pan.len() - 1]);
 
-            let res = des_ede2_decrypt(&pin_block, &hex::decode(key).unwrap().to_vec());
+            let res = tdes_ede2_decrypt(&pin_block, &hex::decode(key).unwrap().to_vec());
             let res = xor_hexstr(hex::encode(res.as_slice()).as_str(), b2.as_str());
             let pin_len = res.get(0).unwrap();
             let b1 = hex::encode(&res);
