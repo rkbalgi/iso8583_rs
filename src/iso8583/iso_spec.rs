@@ -10,6 +10,7 @@ use crate::iso8583::yaml_de::YMessageSegment;
 use crate::iso8583::bitmap::Bitmap;
 use crate::iso8583::config::Config;
 use crate::crypto::pin::generate_pin_block;
+use crate::crypto::mac::generate_mac;
 
 // Reads the spec definitions from YAML file
 lazy_static! {
@@ -279,7 +280,6 @@ impl IsoMsg {
 
     /// Sets F52 based on provided clear pin, and format, key provided via cfg
     pub fn set_pin(&mut self, pin: &str, pan: &str, cfg: &Config) -> Result<(), IsoError> {
-
         if cfg.get_pin_fmt().is_none() || cfg.get_pin_key().is_none() {
             return Err(IsoError { msg: format!("missing pin_format or key in call to set_pin") });
         }
@@ -287,6 +287,47 @@ impl IsoMsg {
         match generate_pin_block(&cfg.get_pin_fmt().as_ref().unwrap(), pin, pan, cfg.get_pin_key().as_ref().unwrap().as_str()) {
             Ok(v) => {
                 self.set_on(52, hex::encode(v).as_str())
+            }
+            Err(e) => {
+                Err(IsoError { msg: e.msg })
+            }
+        }
+    }
+
+    /// Sets F64 or F128 based on algo, padding and key provided via cfg
+    pub fn set_mac(&mut self, cfg: &Config) -> Result<(), IsoError> {
+        if cfg.get_mac_algo().is_none() || cfg.get_mac_padding().is_none() || cfg.get_mac_key().is_none() {
+            return Err(IsoError { msg: format!("missing mac_algo or padding or key in call to set_mac") });
+        }
+
+
+        if self.bmp.is_on(1) {
+            self.set_on(128,"0000000000000000");
+        } else {
+            self.set_on(64,"0000000000000000");
+        }
+
+
+        let data: Vec<u8> = match self.assemble() {
+            Ok(v) => {
+                v
+            }
+            Err(e) => {
+                return Err(e);
+            }
+        };
+
+        debug!("generating mac on: {}", hex::encode(&data));
+
+        match generate_mac(&cfg.get_mac_algo().as_ref().unwrap(), &cfg.get_mac_padding().as_ref().unwrap(),
+                           &data[0..data.len()-8].to_vec(), &hex::decode(cfg.get_mac_key().as_ref().unwrap()).unwrap()) {
+            Ok(v) => {
+                if self.bmp.is_on(1) {
+                    self.set_on(128, hex::encode(v).as_str());
+                } else {
+                    self.set_on(64, hex::encode(v).as_str());
+                }
+                Ok(())
             }
             Err(e) => {
                 Err(IsoError { msg: e.msg })

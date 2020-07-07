@@ -115,12 +115,26 @@ messages:
             data_encoding: ASCII
             position: 63
 
+          - name: "mac_1"
+            id: 21
+            type: Fixed
+            len: 8
+            data_encoding: BINARY
+            position: 64
+
           - name: "key_mgmt_data"
             id: 14
             type: Fixed
             len: 4
             data_encoding: ASCII
             position: 96
+
+          - name: "mac_2"
+            id: 22
+            type: Fixed
+            len: 8
+            data_encoding: BINARY
+            position: 128
 
           - name: "reserved_data"
             id: 14

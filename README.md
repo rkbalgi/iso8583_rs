@@ -7,9 +7,10 @@ ISO8583 library written in Rust
 
 __Early days., No promise of backward compatibility for v0.1.* :)__
 
-## New in 0.1.7
+### New in 0.1.7
 * Support for building PIN blocks (F52) in ISO0,ISO1,ISO2,ISO3 formats
-
+### New in 0.1.8
+* Support for Retail (X9.19 or ISO9797 Algorithm-3) and CBC MAC (ISO9797 Algorithm-1)
 ## Features
 
 * Define a ISO specification in a YAML file
@@ -43,6 +44,8 @@ extern crate lazy_static;
 #[macro_use]
 extern crate log;
 extern crate simplelog;
+#[macro_use]
+extern crate hex_literal;
 
 use iso8583_rs::iso8583::iso_spec::{IsoMsg, new_msg};
 use iso8583_rs::iso8583::IsoError;
@@ -51,6 +54,11 @@ use iso8583_rs::iso8583::server::ISOServer;
 use iso8583_rs::iso8583::server::MsgProcessor;
 use iso8583_rs::crypto::pin::verify_pin;
 use iso8583_rs::crypto::pin::PinFormat::ISO0;
+use std::path::Path;
+use iso8583_rs::crypto::mac::MacAlgo::RetailMac;
+use iso8583_rs::crypto::mac::PaddingType::Type1;
+use iso8583_rs::crypto::mac::verify_mac;
+
 
 // Below is an example implementation of a MsgProcessor i.e the entity responsible for handling incoming messages
 // at the server
@@ -82,7 +90,7 @@ impl MsgProcessor for SampleMsgProcessor {
                     iso_resp_msg.echo_from(&iso_msg, &[2, 3, 4, 11, 14, 19, 96])?;
                     iso_resp_msg.set_on(39, "400").unwrap_or_default();
                 } else if req_msg_type == "1100" {
-                    handle_1100(&iso_msg, &mut iso_resp_msg)?
+                    handle_1100(&iso_msg, msg, &mut iso_resp_msg)?
                 }
 
 
@@ -110,8 +118,35 @@ impl MsgProcessor for SampleMsgProcessor {
 //   F39 = 100;
 //
 //
-fn handle_1100(iso_msg: &IsoMsg, iso_resp_msg: &mut IsoMsg) -> Result<(), IsoError> {
+fn handle_1100(iso_msg: &IsoMsg, raw_msg: &Vec<u8>, iso_resp_msg: &mut IsoMsg) -> Result<(), IsoError> {
     iso_resp_msg.set("message_type", "1110").unwrap_or_default();
+    //validate the mac
+    if iso_msg.bmp.is_on(64) || iso_msg.bmp.is_on(128) {
+
+        let key=hex!("e0f4543f3e2a2c5ffc7e5e5a222e3e4d").to_vec();
+        let expected_mac = match iso_msg.bmp.is_on(64) {
+            true => {
+                iso_msg.bmp_child_value(64)
+            }
+            false => {
+                iso_msg.bmp_child_value(128)
+            }
+        };
+        let mac_data=&raw_msg.as_slice()[0..raw_msg.len() - 8];
+        match verify_mac(&RetailMac, &Type1, mac_data, &key, &hex::decode(expected_mac.unwrap()).unwrap()) {
+            Ok(_) => {
+                debug!("mac verified OK!");
+            }
+            Err(e) => {
+                error!("failed to verify mac. Reason: {}", e.msg);
+                iso_resp_msg.set("message_type", "1110").unwrap_or_default();
+                iso_resp_msg.set_on(39, "916").unwrap_or_default();
+                iso_resp_msg.echo_from(&iso_msg, &[2, 3, 4, 11, 14, 19, 96]);
+                return Ok(());
+            }
+        }
+    }
+
 
     if !iso_msg.bmp.is_on(4) {
         error!("No amount in request, responding with F39 = 115 ");
@@ -187,7 +222,9 @@ fn handle_1100(iso_msg: &IsoMsg, iso_resp_msg: &mut IsoMsg) -> Result<(), IsoErr
 
 
 fn main() {
-    std::env::set_var("SPEC_FILE", "sample_spec\\sample_spec.yaml");
+    let path = Path::new(".").join("sample_spec").join("sample_spec.yaml");
+    let spec_file = path.to_str().unwrap();
+    std::env::set_var("SPEC_FILE", spec_file);
 
     let _ = simplelog::SimpleLogger::init(simplelog::LevelFilter::Debug, simplelog::Config::default());
 
@@ -211,15 +248,15 @@ fn main() {
 
 
 
-
 ```
 
 ## Sample TCP client
 
 ```rust
     
-    fn test_send_recv_iso_1100() -> Result<(), IsoError> {
-        std::env::set_var("SPEC_FILE", "sample_spec/sample_spec.yaml");
+fn test_send_recv_iso_1100() -> Result<(), IsoError> {
+        let path = Path::new(".").join("sample_spec").join("sample_spec.yaml");
+        std::env::set_var("SPEC_FILE", path.to_str().unwrap());
 
         let spec = crate::iso8583::iso_spec::spec("");
         let msg_seg = spec.get_message_from_header("1100").unwrap();
@@ -236,9 +273,12 @@ fn main() {
         iso_msg.set_on(19, "840").unwrap();
 
 
-        //--------- set pin - F52
         let mut cfg = Config::new();
-        cfg.with_pin(ISO0, String::from("e0f4543f3e2a2c5ffc7e5e5a222e3e4d"));
+        cfg.with_pin(ISO0, String::from("e0f4543f3e2a2c5ffc7e5e5a222e3e4d"))
+            .with_mac(RetailMac, Type1, String::from("e0f4543f3e2a2c5ffc7e5e5a222e3e4d"));
+
+
+        //--------- set pin - F52
 
         //this will compute a pin based on cfg and the supplied pan and set bit position 52
         iso_msg.set_pin("1234", iso_msg.bmp_child_value(2).unwrap().as_str(), &cfg).unwrap();
@@ -252,7 +292,12 @@ fn main() {
         iso_msg.set_on(62, "reserved-2").unwrap();
         iso_msg.set_on(63, "87877622525").unwrap();
         iso_msg.set_on(96, "1234").unwrap();
-        iso_msg.set_on(160, "5678").unwrap();
+
+
+        //--------- set mac  - either F64 or F128
+        iso_msg.set_mac(&cfg);
+        //--------- set mac
+
 
         let mut client = ISOTcpClient::new("localhost:6666", &spec, MLI2E);
 
@@ -277,72 +322,74 @@ C:/Users/rkbal/.cargo/bin/cargo.exe run --color=always --package iso8583_rs --bi
    Compiling iso8583_rs v0.1.6 (C:\Users\rkbal\IdeaProjects\iso8583_rs)
     Finished dev [unoptimized + debuginfo] target(s) in 2.97s
      Running `target\debug\iso8583_rs.exe`
+
 current-dir: C:\Users\rkbal\IdeaProjects\iso8583_rs
-spec-file: sample_spec\sample_spec.yaml
-16:54:50 [INFO] starting iso server for spec SampleSpec at port 6666
-16:54:59 [DEBUG] (2) iso8583_rs::iso8583::server: Accepted new connection .. Ok(V4(127.0.0.1:57338))
-16:54:59 [DEBUG] (3) iso8583_rs::iso8583::server: received request: 
+spec-file: .\sample_spec\sample_spec.yaml
+15:54:37 [INFO] starting iso server for spec SampleSpec at port 6666
+15:54:47 [DEBUG] (2) iso8583_rs::iso8583::server: Accepted new connection .. Ok(V4(127.0.0.1:56307))
+15:54:47 [DEBUG] (3) iso8583_rs::iso8583::server: received request: 
 
-|31313030 f0242000 0000100e 80000001| 1100.$ ......... 00000000
-|00000000 00000001 00000000 31363435| ............1645 00000010
-|36373930 39383435 36373132 33353030| 6790984567123500 00000020
-|34303030 30303030 30303030 30303239| 4000000000000029 00000030
-|37373935 38313232 3034f8f4 f0268977| 7795812204...&.w 00000040
-|50330a80 a7001072 65736572 7665645f| P3.....reserved_ 00000050
-|310a9985 a28599a5 858460f2 f0f1f138| 1.........`....8 00000060
-|37383737 36323235 32353132 33343536| 7877622525123456 00000070
-|3738|                                78               00000080
-                                                       00000082
+|31313030 f0242000 0000100e 00000001| 1100.$ ......... 00000000
+|00000001 31363435 36373930 39383435| ....164567909845 00000010
+|36373132 33353030 34303030 30303030| 6712350040000000 00000020
+|30303030 30303239 37373935 38313232| 0000002977958122 00000030
+|3034f8f4 f077fcbd 9ffc0dfa 6f001072| 04...w......o..r 00000040
+|65736572 7665645f 310a9985 a28599a5| eserved_1....... 00000050
+|858460f2 f0f1f138 37383737 36323235| ..`....878776225 00000060
+|32353132 3334e470 06f5de8c 70b9|     251234.p....p.   00000070
+                                                       0000007e
 
- len = 130
-16:54:59 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: computed header value for incoming message = 1100
-16:54:59 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: parsing field : message_type
-16:54:59 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: parsing field : bitmap
-16:54:59 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - pan
-16:54:59 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - proc_code
-16:54:59 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - amount
-16:54:59 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - stan
-16:54:59 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - expiration_date
-16:54:59 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - country_code
-16:54:59 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - pin_data
-16:54:59 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - private_1
-16:54:59 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - private_2
-16:54:59 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - private_3
-16:54:59 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - key_mgmt_data
-16:54:59 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - reserved_data
-16:54:59 [DEBUG] (3) iso8583_rs: parsed incoming request - message = "1100 - Authorization" successfully. 
+ len = 126
+15:54:47 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: computed header value for incoming message = 1100
+15:54:47 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: parsing field : message_type
+15:54:47 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: parsing field : bitmap
+15:54:47 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - pan
+15:54:47 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - proc_code
+15:54:47 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - amount
+15:54:47 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - stan
+15:54:47 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - expiration_date
+15:54:47 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - country_code
+15:54:47 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - pin_data
+15:54:47 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - private_1
+15:54:47 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - private_2
+15:54:47 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - private_3
+15:54:47 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - key_mgmt_data
+15:54:47 [DEBUG] (3) iso8583_rs::iso8583::bitmap: parsing field - mac_2
+15:54:47 [DEBUG] (3) iso8583_rs: parsed incoming request - message = "1100 - Authorization" successfully. 
  : parsed message: 
  --- 
  
 -Field-              : -Position-  : -Field Value- 
 message_type         :             : 1100 
-bitmap               :             : f02420000000100e80000001000000000000000100000000 
+bitmap               :             : f02420000000100e0000000100000001 
 pan                  :    002      : 4567909845671235 
 proc_code            :    003      : 004000 
 amount               :    004      : 000000000029 
 stan                 :    011      : 779581 
 expiration_date      :    014      : 2204 
 country_code         :    019      : 840 
-pin_data             :    052      : 26897750330a80a7 
+pin_data             :    052      : 77fcbd9ffc0dfa6f 
 private_1            :    061      : reserved_1 
 private_2            :    062      : reserved-2 
 private_3            :    063      : 87877622525 
 key_mgmt_data        :    096      : 1234 
-reserved_data        :    160      : 5678  
+mac_2                :    128      : e47006f5de8c70b9  
  ----
 
-16:54:59 [DEBUG] (3) iso8583_rs: amount = 29
-16:54:59 [DEBUG] (3) iso8583_rs: verifying pin ... 
-16:54:59 [DEBUG] (3) iso8583_rs::crypto::pin: verifying pin - expected_pin: 1234,  block: 26897750330a80a7, pan:4567909845671235, key:e0f4543f3e2a2c5ffc7e5e5a222e3e4d
-16:54:59 [DEBUG] (3) iso8583_rs: PIN verified OK.
-16:54:59 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: echoing .. 2: 4567909845671235
-16:54:59 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: echoing .. 3: 004000
-16:54:59 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: echoing .. 4: 000000000029
-16:54:59 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: echoing .. 11: 779581
-16:54:59 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: echoing .. 14: 2204
-16:54:59 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: echoing .. 19: 840
-16:54:59 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: echoing .. 96: 1234
-16:54:59 [DEBUG] (3) iso8583_rs::iso8583::server: iso_response : 
+generating mac on 31313030f02420000000100e000000010000000131363435363739303938343536373132333530303430303030303030303030303030323937373935383132323034f8f4f077fcbd9ffc0dfa6f001072657365727665645f310a9985a28599a5858460f2f0f1f1383738373736323235323531323334
+15:54:47 [DEBUG] (3) iso8583_rs: mac verified OK!
+15:54:47 [DEBUG] (3) iso8583_rs: amount = 29
+15:54:47 [DEBUG] (3) iso8583_rs: verifying pin ... 
+15:54:47 [DEBUG] (3) iso8583_rs::crypto::pin: verifying pin - expected_pin: 1234,  block: 77fcbd9ffc0dfa6f, pan:4567909845671235, key:e0f4543f3e2a2c5ffc7e5e5a222e3e4d
+15:54:47 [DEBUG] (3) iso8583_rs: PIN verified OK.
+15:54:47 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: echoing .. 2: 4567909845671235
+15:54:47 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: echoing .. 3: 004000
+15:54:47 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: echoing .. 4: 000000000029
+15:54:47 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: echoing .. 11: 779581
+15:54:47 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: echoing .. 14: 2204
+15:54:47 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: echoing .. 19: 840
+15:54:47 [DEBUG] (3) iso8583_rs::iso8583::iso_spec: echoing .. 96: 1234
+15:54:47 [DEBUG] (3) iso8583_rs::iso8583::server: iso_response : 
 |31313130 f0242000 0600000e 80000001| 1110.$ ......... 00000000
 |00000000 00000001 00000000 31363435| ............1645 00000010
 |36373930 39383435 36373132 33353030| 6790984567123500 00000020
@@ -374,8 +421,8 @@ key_mgmt_data        :    096      : 1234
 reserved_data        :    160      : F160  
  --- 
 
-16:54:59 [DEBUG] (3) iso8583_rs::iso8583::server: request processing time = 5 millis
-16:54:59 [ERROR] client socket_err: 127.0.0.1:57338 failed to fill whole buffer
+15:54:47 [DEBUG] (3) iso8583_rs::iso8583::server: request processing time = 9 millis
+15:54:47 [ERROR] client socket_err: 127.0.0.1:56307 failed to fill whole buffer
 
 
 ``` 
@@ -385,12 +432,13 @@ reserved_data        :    160      : F160
 Now run src/iso8583/test.rs:test_send_recv_iso_1100(..)
 
 ```
-Testing started at 22:24 ...
-current-dir: C:\Users\rkbal\IdeaProjects\iso8583_rs
-spec-file: sample_spec/sample_spec.yaml
-= 041234bea870366b
-raw iso msg = 008231313030f02420000000100e8000000100000000000000010000000031363435363739303938343536373132333530303430303030303030303030303030323937373935383132323034f8f4f026897750330a80a7001072657365727665645f310a9985a28599a5858460f2f0f1f138373837373632323532353132333435363738
-connected to server @ Ok(V4(127.0.0.1:57338))
+Testing started at 21:24 ...
+kbalIdeaProjectsiso8583_rs
+spec-file: .sample_specsample_spec.yaml
+= 04123423142edc39
+generating mac on 31313030f02420000000100e000000010000000131363435363739303938343536373132333530303430303030303030303030303030323937373935383132323034f8f4f077fcbd9ffc0dfa6f001072657365727665645f310a9985a28599a5858460f2f0f1f1383738373736323235323531323334
+raw iso msg = 007e31313030f02420000000100e000000010000000131363435363739303938343536373132333530303430303030303030303030303030323937373935383132323034f8f4f077fcbd9ffc0dfa6f001072657365727665645f310a9985a28599a5858460f2f0f1f1383738373736323235323531323334e47006f5de8c70b9
+connected to server @ Ok(V4(127.0.0.1:56307))
 received response: with  129 bytes. 
  
 |31313130 f0242000 0600000e 80000001| 1110.$ ......... 00000000
@@ -423,6 +471,7 @@ private_2            :    062      : reserved-2-OK
 private_3            :    063      : 007 
 key_mgmt_data        :    096      : 1234 
 reserved_data        :    160      : F160 
+
 
 ```
 

@@ -2,12 +2,13 @@
 //! crypto field F52, F64/128 etc
 
 use crate::crypto::pin::PinFormat;
-use crate::crypto::mac::MacAlgo;
+use crate::crypto::mac::{MacAlgo, PaddingType};
 
 pub struct Config {
     pin_format: Option<PinFormat>,
     pin_key: Option<String>,
     mac_algo: Option<MacAlgo>,
+    mac_padding: Option<PaddingType>,
     mac_key: Option<String>,
 }
 
@@ -20,6 +21,7 @@ impl Config {
             pin_key: None,
             mac_algo: None,
             mac_key: None,
+            mac_padding: None,
         }
     }
 
@@ -33,6 +35,22 @@ impl Config {
         &self.pin_key
     }
 
+    /// Returns the MAC key associated with this config
+    pub fn get_mac_key(&self) -> &Option<String> {
+        &self.mac_key
+    }
+
+    /// Returns the MAC'ing algorithm associated with this config
+    pub fn get_mac_algo(&self) -> &Option<MacAlgo> {
+        &self.mac_algo
+    }
+
+    /// Returns the MAC padding scheme associated with this config
+    pub fn get_mac_padding(&self) -> &Option<PaddingType> {
+        &self.mac_padding
+    }
+
+
     /// Use the Config with a builder pattern
     pub fn with_pin(&mut self, fmt: PinFormat, key: String) -> &mut Config {
         self.pin_format = Some(fmt);
@@ -41,9 +59,10 @@ impl Config {
     }
 
     /// Use the Config with a builder pattern
-    pub fn with_mac(&mut self, algo: MacAlgo, key: String) -> &mut Config {
+    pub fn with_mac(&mut self, algo: MacAlgo, mac_padding: PaddingType, key: String) -> &mut Config {
         self.mac_algo = Some(algo);
         self.mac_key = Some(key);
+        self.mac_padding = Some(mac_padding);
         self
     }
 }
