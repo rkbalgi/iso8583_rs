@@ -39,7 +39,7 @@ mod tests {
             .with_mac(RetailMac, Type1, String::from("e0f4543f3e2a2c5ffc7e5e5a222e3e4d"));
 
 
-        //--------- set pin - F52
+        //start --------- set pin - F52
 
         //this will compute a pin based on cfg and the supplied pan and set bit position 52
         iso_msg.set_pin("1234", iso_msg.bmp_child_value(2).unwrap().as_str(), &cfg).unwrap();
@@ -47,17 +47,21 @@ mod tests {
         // You can also directly set this if there are other means of computing the pin block
         // iso_msg.set_on(52, "0102030405060708").unwrap(); //binary field are represented in their hex encoded format
 
-        //--------- set pin - F52
+        //end   --------- set pin - F52
 
+
+        // some other fields
         iso_msg.set_on(61, "reserved_1").unwrap();
         iso_msg.set_on(62, "reserved-2").unwrap();
         iso_msg.set_on(63, "87877622525").unwrap();
         iso_msg.set_on(96, "1234").unwrap();
 
-
-        //--------- set mac  - either F64 or F128
+        //start --------- set mac  - either F64 or F128
+        //
+        // This should be the last thing you should do with the msg
+        // as any further modifications will not recompute the MAC
         iso_msg.set_mac(&cfg);
-        //--------- set mac
+        //end   --------- set mac
 
 
         let mut client = ISOTcpClient::new("localhost:6666", &spec, MLI2E);
@@ -70,6 +74,7 @@ mod tests {
                 eprintln!("{:?}", e)
             }
         }
+        client.close();
         Ok(())
     }
 

@@ -1,7 +1,7 @@
 //! This module contains implementation of various MLI types associated with a ISO message
 use crate::iso8583::IsoError;
 use byteorder::{WriteBytesExt, ReadBytesExt};
-use std::io::Read;
+use std::io::{Read, ErrorKind, Error};
 
 
 pub enum MLIType {
@@ -30,6 +30,17 @@ pub struct MLI4E {}
 /// This struct represents an MLI of 4I (i.e 4 bytes of length indicator inclusive of its own length)
 pub struct MLI4I {}
 
+/// convert a std::io::Error into an IsoError
+fn convert_err(e: &Error) -> IsoError {
+    match e.kind() {
+        ErrorKind::ConnectionReset | ErrorKind::UnexpectedEof => {
+            IsoError { msg: format!("connection closed. cause: {:?}", e.kind()) }
+        }
+        _ => {
+            IsoError { msg: format!("{:?}: {}", e.kind(), e.to_string()) }
+        }
+    }
+}
 
 impl MLI for MLI2E {
     fn parse(&self, in_buf: &mut dyn Read) -> Result<u32, IsoError> {
@@ -37,7 +48,9 @@ impl MLI for MLI2E {
             Ok(n) => {
                 Ok(n as u32)
             }
-            Err(e) => Err(IsoError { msg: e.to_string() })
+            Err(e) => {
+                Err(convert_err(&e))
+            }
         }
     }
 
@@ -53,7 +66,9 @@ impl MLI for MLI4E {
     fn parse(&self, in_buf: &mut dyn Read) -> Result<u32, IsoError> {
         match in_buf.read_u32::<byteorder::BigEndian>() {
             Ok(n) => Ok(n),
-            Err(e) => Err(IsoError { msg: e.to_string() })
+            Err(e) => {
+                Err(convert_err(&e))
+            }
         }
     }
 
@@ -69,7 +84,9 @@ impl MLI for MLI2I {
     fn parse(&self, in_buf: &mut dyn Read) -> Result<u32, IsoError> {
         match in_buf.read_u16::<byteorder::BigEndian>() {
             Ok(n) => Ok((n - 2) as u32),
-            Err(e) => Err(IsoError { msg: e.to_string() })
+            Err(e) => {
+                Err(convert_err(&e))
+            }
         }
     }
 
@@ -84,7 +101,9 @@ impl MLI for MLI4I {
     fn parse(&self, in_buf: &mut dyn Read) -> Result<u32, IsoError> {
         match in_buf.read_u32::<byteorder::BigEndian>() {
             Ok(n) => Ok(n - 4),
-            Err(e) => Err(IsoError { msg: e.to_string() })
+            Err(e) => {
+                Err(convert_err(&e))
+            }
         }
     }
 
@@ -147,19 +166,17 @@ mod tests {
 
     #[test]
     fn test_4i() {
-
         let mut msg = String::new();
         for _ in 0..257 {
             msg.push('a');
         }
         let mut data: Vec<u8> = vec![];
-        data.write_u32::<byteorder::BigEndian>((msg.len()+4) as u32);
+        data.write_u32::<byteorder::BigEndian>((msg.len() + 4) as u32);
         data.extend_from_slice(msg.as_bytes());
 
 
         let mli: &dyn MLI = &MLI4I {};
         assert_eq!(mli.parse(&mut Cursor::new(data)).unwrap(), 257 as u32);
         assert_eq!(mli.create(&(msg.len() as usize)).unwrap(), vec![0x00, 0x00, 0x01 as u8, 0x05 as u8]);
-
     }
 }

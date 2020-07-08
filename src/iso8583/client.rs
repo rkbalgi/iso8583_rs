@@ -2,7 +2,7 @@
 
 use crate::iso8583::iso_spec::{Spec, IsoMsg};
 use crate::iso8583::IsoError;
-use std::net::TcpStream;
+use std::net::{TcpStream, Shutdown};
 use crate::iso8583::mli::{MLI, MLIType, MLI2E, MLI2I, MLI4E, MLI4I};
 use std::io::{Write, Read};
 use crate::iso8583::server::get_hexdump;
@@ -95,5 +95,9 @@ impl ISOTcpClient {
                 Err(IsoError { msg: e.to_string() })
             }
         }
+    }
+
+    pub fn close(&mut self) {
+        self._tcp_stream.as_ref().unwrap().shutdown(Shutdown::Both);
     }
 }

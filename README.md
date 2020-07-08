@@ -21,6 +21,7 @@ __Early days., No promise of backward compatibility for v0.1.* :)__
 * An ENV variable **SPEC_FILE** defines the location of the YAML spec definition file 
 * Supports ASCII, EBCDIC, BINARY/BCD encoding
 * Support for building PIN blocks (F52) in ISO0,ISO1,ISO2,ISO3 formats
+* Support for Retail (X9.19 or ISO9797 Algorithm-3) and CBC MAC (ISO9797 Algorithm-1)
 
 ## Notes
 
@@ -34,7 +35,7 @@ On successful match, the incoming data is parsed against the message. Once parse
 defined on the server. The MsgProcessor applies its logic and generates a response which is sent back to the client.   
 
 
-## Demo Application: 
+## Example Server Application: 
 (from main.rs)
 
 ``` rust
