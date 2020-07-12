@@ -108,7 +108,7 @@ fn new_client(iso_server: &ISOServer, stream_: TcpStream) {
         'done:
         loop {
             if reading_mli {
-                let mut peek_buf = vec![0; 2];
+                let mut peek_buf = vec![0; 1];
                 let bytes_read = stream.peek(&mut peek_buf).unwrap();
 
                 if bytes_read == 0 {
