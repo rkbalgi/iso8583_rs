@@ -2,6 +2,8 @@
 use crate::iso8583::IsoError;
 use byteorder::{WriteBytesExt, ReadBytesExt};
 use std::io::{Read, ErrorKind, Error};
+use std::net::{TcpStream};
+
 
 
 pub enum MLIType {
@@ -16,6 +18,8 @@ pub trait MLI: Sync + Send {
     fn parse(&self, in_buf: &mut dyn Read) -> Result<u32, IsoError>;
     /// Creates a Vec<u8> that represents the MLI containing n bytes
     fn create(&self, n: &usize) -> Result<Vec<u8>, IsoError>;
+    /// Checks to see if data is available for `MLI::parse`
+    fn is_available(&self, stream: &TcpStream) -> Result<bool, IsoError>;
 }
 
 /// This struct represents an MLI of 2E (i.e 2 bytes of length indicator exclusive of its own length)
