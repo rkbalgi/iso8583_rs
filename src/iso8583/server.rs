@@ -108,13 +108,10 @@ fn new_client(iso_server: &ISOServer, stream_: TcpStream) {
         'done:
         loop {
             if reading_mli {
-                let mut peek_buf = vec![0; 1];
-                let bytes_read = stream.peek(&mut peek_buf).unwrap();
-
-                if bytes_read == 0 {
-                    println!("client closed the connection.");
-                    break 'done;
-                }
+                match server.mli.is_available(&stream) {
+                    Ok(true) => true,
+                    IsoError => break 'done,
+                };
 
                 match server.mli.parse(&mut reader) {
                     Ok(n) => {
