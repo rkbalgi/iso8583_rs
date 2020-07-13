@@ -63,6 +63,15 @@ impl MLI for MLI2E {
         let _ = mli.write_u16::<byteorder::BigEndian>(n.clone() as u16);
         Ok(mli)
     }
+
+    fn is_available(&self, stream: &TcpStream) -> Result<bool, IsoError> {
+        let mut buf = vec![0; 2];
+
+        match stream.peek(&mut buf).unwrap() {
+            2 => Ok(true),
+            _ => Err(IsoError { msg: format!("Client disconnected")})
+        }
+    }
 }
 
 
@@ -80,6 +89,15 @@ impl MLI for MLI4E {
         let mut mli = Vec::<u8>::new();
         let _ = mli.write_u32::<byteorder::BigEndian>(n.clone() as u32);
         Ok(mli)
+    }
+
+    fn is_available(&self, stream: &TcpStream) -> Result<bool, IsoError> {
+        let mut buf = vec![0; 4];
+
+        match stream.peek(&mut buf).unwrap() {
+            4 => Ok(true),
+            _ => Err(IsoError { msg: format!("Client disconnected")})
+        }
     }
 }
 
@@ -99,6 +117,15 @@ impl MLI for MLI2I {
         let _ = mli.write_u16::<byteorder::BigEndian>((n.clone() as u16) + 2);
         Ok(mli)
     }
+
+    fn is_available(&self, stream: &TcpStream) -> Result<bool, IsoError> {
+        let mut buf = vec![0; 2];
+
+        match stream.peek(&mut buf).unwrap() {
+            2 => Ok(true),
+            _ => Err(IsoError { msg: format!("Client disconnected")})
+        }
+    }
 }
 
 impl MLI for MLI4I {
@@ -115,6 +142,15 @@ impl MLI for MLI4I {
         let mut mli = Vec::<u8>::new();
         let _ = mli.write_u32::<byteorder::BigEndian>((n.clone() as u32) + 4);
         Ok(mli)
+    }
+
+    fn is_available(&self, stream: &TcpStream) -> Result<bool, IsoError> {
+        let mut buf = vec![0; 4];
+
+        match stream.peek(&mut buf).unwrap() {
+            4 => Ok(true),
+            _ => Err(IsoError { msg: format!("Client disconnected")})
+        }
     }
 }
 
