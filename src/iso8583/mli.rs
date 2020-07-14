@@ -67,9 +67,15 @@ impl MLI for MLI2E {
     fn is_available(&self, stream: &TcpStream) -> Result<bool, IsoError> {
         let mut buf = vec![0; 2];
 
-        match stream.peek(&mut buf).unwrap() {
-            2 => Ok(true),
-            _ => Err(IsoError { msg: format!("Client disconnected")})
+        match stream.peek(&mut buf) {
+            Ok(n) => {
+                if n == 2 {
+                    Ok(true)
+                } else {
+                    Err(IsoError { msg: format!("client disconnected") })
+                }
+            }
+            Err(e) => Err(IsoError { msg: format!("stream err. cause: {}", e.to_string()) })
         }
     }
 }
@@ -94,9 +100,15 @@ impl MLI for MLI4E {
     fn is_available(&self, stream: &TcpStream) -> Result<bool, IsoError> {
         let mut buf = vec![0; 4];
 
-        match stream.peek(&mut buf).unwrap() {
-            4 => Ok(true),
-            _ => Err(IsoError { msg: format!("Client disconnected")})
+        match stream.peek(&mut buf) {
+            Ok(n) => {
+                if n == 4 {
+                    Ok(true)
+                } else {
+                    Err(IsoError { msg: format!("client disconnected") })
+                }
+            }
+            Err(e) => Err(IsoError { msg: format!("stream err. cause: {}", e.to_string()) })
         }
     }
 }
@@ -121,9 +133,15 @@ impl MLI for MLI2I {
     fn is_available(&self, stream: &TcpStream) -> Result<bool, IsoError> {
         let mut buf = vec![0; 2];
 
-        match stream.peek(&mut buf).unwrap() {
-            2 => Ok(true),
-            _ => Err(IsoError { msg: format!("Client disconnected")})
+        match stream.peek(&mut buf) {
+            Ok(n) => {
+                if n == 2 {
+                    Ok(true)
+                } else {
+                    Err(IsoError { msg: format!("client disconnected") })
+                }
+            }
+            Err(e) => Err(IsoError { msg: format!("stream err. cause: {}", e.to_string()) })
         }
     }
 }
@@ -147,9 +165,15 @@ impl MLI for MLI4I {
     fn is_available(&self, stream: &TcpStream) -> Result<bool, IsoError> {
         let mut buf = vec![0; 4];
 
-        match stream.peek(&mut buf).unwrap() {
-            4 => Ok(true),
-            _ => Err(IsoError { msg: format!("Client disconnected")})
+        match stream.peek(&mut buf) {
+            Ok(n) => {
+                if n == 4 {
+                    Ok(true)
+                } else {
+                    Err(IsoError { msg: format!("client disconnected") })
+                }
+            }
+            Err(e) => Err(IsoError { msg: format!("stream err. cause: {}", e.to_string()) })
         }
     }
 }
