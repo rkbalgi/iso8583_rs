@@ -2,6 +2,8 @@
 use crate::iso8583::IsoError;
 use byteorder::{WriteBytesExt, ReadBytesExt};
 use std::io::{Read, ErrorKind, Error};
+use std::net::{TcpStream};
+
 
 
 pub enum MLIType {
@@ -16,6 +18,8 @@ pub trait MLI: Sync + Send {
     fn parse(&self, in_buf: &mut dyn Read) -> Result<u32, IsoError>;
     /// Creates a Vec<u8> that represents the MLI containing n bytes
     fn create(&self, n: &usize) -> Result<Vec<u8>, IsoError>;
+    /// Checks to see if data is available for `MLI::parse`
+    fn is_available(&self, stream: &TcpStream) -> Result<bool, IsoError>;
 }
 
 /// This struct represents an MLI of 2E (i.e 2 bytes of length indicator exclusive of its own length)
@@ -59,6 +63,21 @@ impl MLI for MLI2E {
         let _ = mli.write_u16::<byteorder::BigEndian>(n.clone() as u16);
         Ok(mli)
     }
+
+    fn is_available(&self, stream: &TcpStream) -> Result<bool, IsoError> {
+        let mut buf = vec![0; 2];
+
+        match stream.peek(&mut buf) {
+            Ok(n) => {
+                if n == 2 {
+                    Ok(true)
+                } else {
+                    Err(IsoError { msg: format!("client disconnected") })
+                }
+            }
+            Err(e) => Err(IsoError { msg: format!("stream err. cause: {}", e.to_string()) })
+        }
+    }
 }
 
 
@@ -76,6 +95,21 @@ impl MLI for MLI4E {
         let mut mli = Vec::<u8>::new();
         let _ = mli.write_u32::<byteorder::BigEndian>(n.clone() as u32);
         Ok(mli)
+    }
+
+    fn is_available(&self, stream: &TcpStream) -> Result<bool, IsoError> {
+        let mut buf = vec![0; 4];
+
+        match stream.peek(&mut buf) {
+            Ok(n) => {
+                if n == 4 {
+                    Ok(true)
+                } else {
+                    Err(IsoError { msg: format!("client disconnected") })
+                }
+            }
+            Err(e) => Err(IsoError { msg: format!("stream err. cause: {}", e.to_string()) })
+        }
     }
 }
 
@@ -95,6 +129,21 @@ impl MLI for MLI2I {
         let _ = mli.write_u16::<byteorder::BigEndian>((n.clone() as u16) + 2);
         Ok(mli)
     }
+
+    fn is_available(&self, stream: &TcpStream) -> Result<bool, IsoError> {
+        let mut buf = vec![0; 2];
+
+        match stream.peek(&mut buf) {
+            Ok(n) => {
+                if n == 2 {
+                    Ok(true)
+                } else {
+                    Err(IsoError { msg: format!("client disconnected") })
+                }
+            }
+            Err(e) => Err(IsoError { msg: format!("stream err. cause: {}", e.to_string()) })
+        }
+    }
 }
 
 impl MLI for MLI4I {
@@ -111,6 +160,21 @@ impl MLI for MLI4I {
         let mut mli = Vec::<u8>::new();
         let _ = mli.write_u32::<byteorder::BigEndian>((n.clone() as u32) + 4);
         Ok(mli)
+    }
+
+    fn is_available(&self, stream: &TcpStream) -> Result<bool, IsoError> {
+        let mut buf = vec![0; 4];
+
+        match stream.peek(&mut buf) {
+            Ok(n) => {
+                if n == 4 {
+                    Ok(true)
+                } else {
+                    Err(IsoError { msg: format!("client disconnected") })
+                }
+            }
+            Err(e) => Err(IsoError { msg: format!("stream err. cause: {}", e.to_string()) })
+        }
     }
 }
 
