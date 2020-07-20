@@ -108,6 +108,7 @@ fn new_client(iso_server: &ISOServer, stream_: TcpStream) {
         'done:
         loop {
             if reading_mli {
+
                 match server.mli.parse(&mut reader) {
                     Ok(n) => {
                         mli = n;

@@ -12,6 +12,8 @@ mod tests {
     use simplelog;
     use std::env::join_paths;
     use std::path::Path;
+    use std::thread::sleep;
+    use std::time::Duration;
 
     #[test]
     #[ignore]
@@ -74,6 +76,8 @@ mod tests {
                 eprintln!("{:?}", e)
             }
         }
+
+        sleep(Duration::from_secs(60));
         client.close();
         Ok(())
     }
@@ -82,7 +86,6 @@ mod tests {
     #[test]
     #[ignore]
     fn test_send_recv_iso_1420() -> Result<(), IsoError> {
-
         let path = Path::new(".").join("sample_spec").join("sample_spec.yaml");
         std::env::set_var("SPEC_FILE", path.to_str().unwrap());
 

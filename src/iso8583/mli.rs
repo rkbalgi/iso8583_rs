@@ -44,6 +44,7 @@ fn convert_err(e: &Error) -> IsoError {
 
 impl MLI for MLI2E {
     fn parse(&self, in_buf: &mut dyn Read) -> Result<u32, IsoError> {
+        
         match in_buf.read_u16::<byteorder::BigEndian>() {
             Ok(n) => {
                 Ok(n as u32)

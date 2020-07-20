@@ -1,11 +1,7 @@
-extern crate byteorder;
-extern crate hex;
-extern crate lazy_static;
-#[macro_use]
-extern crate log;
-extern crate simplelog;
-#[macro_use]
-extern crate hex_literal;
+use hex;
+use log::{info, debug, error, warn};
+use simplelog;
+use hex_literal::hex as hex_l;
 
 use iso8583_rs::iso8583::iso_spec::{IsoMsg, new_msg};
 use iso8583_rs::iso8583::IsoError;
@@ -82,8 +78,7 @@ fn handle_1100(iso_msg: &IsoMsg, raw_msg: &Vec<u8>, iso_resp_msg: &mut IsoMsg) -
     iso_resp_msg.set("message_type", "1110").unwrap_or_default();
     //validate the mac
     if iso_msg.bmp.is_on(64) || iso_msg.bmp.is_on(128) {
-
-        let key=hex!("e0f4543f3e2a2c5ffc7e5e5a222e3e4d").to_vec();
+        let key = hex_l!("e0f4543f3e2a2c5ffc7e5e5a222e3e4d").to_vec();
         let expected_mac = match iso_msg.bmp.is_on(64) {
             true => {
                 iso_msg.bmp_child_value(64)
@@ -92,7 +87,7 @@ fn handle_1100(iso_msg: &IsoMsg, raw_msg: &Vec<u8>, iso_resp_msg: &mut IsoMsg) -
                 iso_msg.bmp_child_value(128)
             }
         };
-        let mac_data=&raw_msg.as_slice()[0..raw_msg.len() - 8];
+        let mac_data = &raw_msg.as_slice()[0..raw_msg.len() - 8];
         match verify_mac(&RetailMac, &Type1, mac_data, &key, &hex::decode(expected_mac.unwrap()).unwrap()) {
             Ok(_) => {
                 debug!("mac verified OK!");
