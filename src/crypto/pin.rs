@@ -21,7 +21,7 @@ pub struct PinError {
     pub msg: String
 }
 
-pub fn generate_pin_block(fmt: &PinFormat, c_pin: &str, pan: &str, key: &str) -> Result<Vec<u8>, PinError> {
+pub fn generate_pin_block(fmt: &PinFormat, c_pin: &str, pan: &str, key: &Vec<u8>) -> Result<Vec<u8>, PinError> {
     match fmt {
         PinFormat::ISO0 => {
             let mut b1 = format!("0{:X}{}", c_pin.len(), c_pin);
@@ -33,7 +33,7 @@ pub fn generate_pin_block(fmt: &PinFormat, c_pin: &str, pan: &str, key: &str) ->
             b2.push_str(&pan[pan.len() - 13..pan.len() - 1]);
 
             let res = xor_hexstr(b1.as_str(), b2.as_str());
-            let res = tdes_ede2_encrypt(&res, &hex::decode(key).unwrap().to_vec());
+            let res = tdes_ede2_encrypt(&res, &key);
 
             Ok(res.to_vec())
         }
@@ -91,14 +91,14 @@ pub fn generate_pin_block(fmt: &PinFormat, c_pin: &str, pan: &str, key: &str) ->
 
 /// Verifies the pin in the 'pin_block' against expected_pin and returns a boolean to indicate if there was
 /// was a successful match
-pub fn verify_pin(fmt: &PinFormat, expected_pin: &str, pin_block: &Vec<u8>, pan: &str, key: &str) -> Result<bool, PinError> {
-    debug!("verifying pin - expected_pin: {},  block: {}, pan:{}, key:{}", expected_pin, hex::encode(pin_block), pan, key);
+pub fn verify_pin(fmt: &PinFormat, expected_pin: &str, pin_block: &Vec<u8>, pan: &str, key: &Vec<u8>) -> Result<bool, PinError> {
+    debug!("verifying pin - expected_pin: {},  block: {}, pan:{}, key:{:?}", expected_pin, hex::encode(pin_block), pan, key);
     match fmt {
         PinFormat::ISO0 => {
             let mut b2 = String::from("0000");
             b2.push_str(&pan[pan.len() - 13..pan.len() - 1]);
 
-            let res = tdes_ede2_decrypt(&pin_block, &hex::decode(key).unwrap().to_vec());
+            let res = tdes_ede2_decrypt(&pin_block, &key);
             let res = xor_hexstr(hex::encode(res.as_slice()).as_str(), b2.as_str());
             let pin_len = res.get(0).unwrap();
             let b1 = hex::encode(&res);
@@ -156,7 +156,6 @@ pub fn verify_pin(fmt: &PinFormat, expected_pin: &str, pin_block: &Vec<u8>, pan:
 }
 
 
-
 /// XOR the contents of 2 hex string (of equal length) and return the result
 /// as a Vec<u8>
 fn xor_hexstr(b1: &str, b2: &str) -> Vec<u8> {
@@ -192,13 +191,17 @@ mod tests {
     use crate::crypto::pin::{generate_pin_block, verify_pin};
     use crate::crypto::pin::PinFormat::{ISO0, ISO1, ISO2, ISO3};
 
+    static KEY_: [u8; 16] = hex_literal::hex!("e0f4543f3e2a2c5ffc7e5e5a222e3e4d");
+
     #[test]
     fn test_iso0() {
-        match generate_pin_block(&ISO0, "1234", "4111111111111111", "e0f4543f3e2a2c5ffc7e5e5a222e3e4d") {
+        let KEY: Vec<u8> = KEY_.to_vec();
+
+        match generate_pin_block(&ISO0, "1234", "4111111111111111", &KEY) {
             Ok(p) => {
                 //assert_eq!(hex::encode(&p), "6042012526a9c2e0");
 
-                match verify_pin(&ISO0, "1234", &p, "4111111111111111", "e0f4543f3e2a2c5ffc7e5e5a222e3e4d") {
+                match verify_pin(&ISO0, "1234", &p, "4111111111111111", &KEY) {
                     Ok(res) => {
                         assert_eq!(res, true)
                     }
@@ -212,11 +215,11 @@ mod tests {
             }
         }
 
-        match generate_pin_block(&ISO0, "12341123456", "4111111111111111", "e0f4543f3e2a2c5ffc7e5e5a222e3e4d") {
+        match generate_pin_block(&ISO0, "12341123456", "4111111111111111", &KEY) {
             Ok(p) => {
                 //assert_eq!(hex::encode(&p), "6042012526a9c2e0");
 
-                match verify_pin(&ISO0, "12341123456", &p, "4111111111111111", "e0f4543f3e2a2c5ffc7e5e5a222e3e4d") {
+                match verify_pin(&ISO0, "12341123456", &p, "4111111111111111", &KEY) {
                     Ok(res) => {
                         assert_eq!(res, true)
                     }
@@ -233,9 +236,12 @@ mod tests {
 
     #[test]
     fn test_iso1() {
-        match generate_pin_block(&ISO1, "8976", "4111111111111111", "e0f4543f3e2a2c5ffc7e5e5a222e3e4d") {
+
+        let KEY: Vec<u8> = KEY_.to_vec();
+
+        match generate_pin_block(&ISO1, "8976", "4111111111111111", &KEY) {
             Ok(p) => {
-                match verify_pin(&ISO1, "8976", &p, "4111111111111111", "e0f4543f3e2a2c5ffc7e5e5a222e3e4d") {
+                match verify_pin(&ISO1, "8976", &p, "4111111111111111", &KEY) {
                     Ok(res) => {
                         assert_eq!(res, true)
                     }
@@ -252,11 +258,13 @@ mod tests {
 
     #[test]
     fn test_iso2() {
-        match generate_pin_block(&ISO2, "8976", "4111111111111111", "e0f4543f3e2a2c5ffc7e5e5a222e3e4d") {
+        let KEY: Vec<u8> = KEY_.to_vec();
+
+        match generate_pin_block(&ISO2, "8976", "4111111111111111", &KEY) {
             Ok(p) => {
                 assert_eq!(hex::encode(&p), "795e511357332491");
 
-                match verify_pin(&ISO2, "8976", &p, "4111111111111111", "e0f4543f3e2a2c5ffc7e5e5a222e3e4d") {
+                match verify_pin(&ISO2, "8976", &p, "4111111111111111", &KEY) {
                     Ok(res) => {
                         assert_eq!(res, true)
                     }
@@ -273,9 +281,11 @@ mod tests {
 
     #[test]
     fn test_iso3() {
-        match generate_pin_block(&ISO3, "1234", "4111111111111111", "e0f4543f3e2a2c5ffc7e5e5a222e3e4d") {
+        let KEY: Vec<u8> = KEY_.to_vec();
+
+        match generate_pin_block(&ISO3, "1234", "4111111111111111", &KEY) {
             Ok(p) => {
-                match verify_pin(&ISO3, "1234", &p, "4111111111111111", "e0f4543f3e2a2c5ffc7e5e5a222e3e4d") {
+                match verify_pin(&ISO3, "1234", &p, "4111111111111111", &KEY) {
                     Ok(res) => {
                         assert_eq!(res, true)
                     }
@@ -289,9 +299,9 @@ mod tests {
             }
         }
 
-        match generate_pin_block(&ISO3, "12341123456", "4111111111111111", "e0f4543f3e2a2c5ffc7e5e5a222e3e4d") {
+        match generate_pin_block(&ISO3, "12341123456", "4111111111111111", &KEY) {
             Ok(p) => {
-                match verify_pin(&ISO3, "12341123456", &p, "4111111111111111", "e0f4543f3e2a2c5ffc7e5e5a222e3e4d") {
+                match verify_pin(&ISO3, "12341123456", &p, "4111111111111111", &KEY) {
                     Ok(res) => {
                         assert_eq!(res, true)
                     }

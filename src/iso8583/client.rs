@@ -98,6 +98,6 @@ impl ISOTcpClient {
     }
 
     pub fn close(&mut self) {
-        self._tcp_stream.as_ref().unwrap().shutdown(Shutdown::Both);
+        self._tcp_stream.as_ref().unwrap().shutdown(Shutdown::Both).unwrap();
     }
 }

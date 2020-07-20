@@ -284,7 +284,7 @@ impl IsoMsg {
             return Err(IsoError { msg: format!("missing pin_format or key in call to set_pin") });
         }
 
-        match generate_pin_block(&cfg.get_pin_fmt().as_ref().unwrap(), pin, pan, cfg.get_pin_key().as_ref().unwrap().as_str()) {
+        match generate_pin_block(&cfg.get_pin_fmt().as_ref().unwrap(), pin, pan, &hex::decode(cfg.get_pin_key().as_ref().unwrap().as_str()).unwrap()) {
             Ok(v) => {
                 self.set_on(52, hex::encode(v).as_str())
             }
@@ -302,10 +302,10 @@ impl IsoMsg {
 
 
         if self.bmp.is_on(1) {
-            self.set_on(128,"0000000000000000");
+            self.set_on(128, "0000000000000000")
         } else {
-            self.set_on(64,"0000000000000000");
-        }
+            self.set_on(64, "0000000000000000")
+        }.unwrap();
 
 
         let data: Vec<u8> = match self.assemble() {
@@ -320,13 +320,15 @@ impl IsoMsg {
         debug!("generating mac on: {}", hex::encode(&data));
 
         match generate_mac(&cfg.get_mac_algo().as_ref().unwrap(), &cfg.get_mac_padding().as_ref().unwrap(),
-                           &data[0..data.len()-8].to_vec(), &hex::decode(cfg.get_mac_key().as_ref().unwrap()).unwrap()) {
+                           &data[0..data.len() - 8].to_vec(), &hex::decode(cfg.get_mac_key().as_ref().unwrap()).unwrap()) {
             Ok(v) => {
+                let pos: u32;
                 if self.bmp.is_on(1) {
-                    self.set_on(128, hex::encode(v).as_str());
+                    pos = 128;
                 } else {
-                    self.set_on(64, hex::encode(v).as_str());
+                    pos = 64;
                 }
+                self.set_on(pos, hex::encode(v).as_str()).unwrap_or_default();
                 Ok(())
             }
             Err(e) => {

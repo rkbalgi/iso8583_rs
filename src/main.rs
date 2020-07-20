@@ -75,10 +75,12 @@ impl MsgProcessor for SampleMsgProcessor {
 //
 //
 fn handle_1100(iso_msg: &IsoMsg, raw_msg: &Vec<u8>, iso_resp_msg: &mut IsoMsg) -> Result<(), IsoError> {
+
+    let key = hex_l!("e0f4543f3e2a2c5ffc7e5e5a222e3e4d").to_vec();
+
     iso_resp_msg.set("message_type", "1110").unwrap_or_default();
     //validate the mac
     if iso_msg.bmp.is_on(64) || iso_msg.bmp.is_on(128) {
-        let key = hex_l!("e0f4543f3e2a2c5ffc7e5e5a222e3e4d").to_vec();
         let expected_mac = match iso_msg.bmp.is_on(64) {
             true => {
                 iso_msg.bmp_child_value(64)
@@ -96,7 +98,7 @@ fn handle_1100(iso_msg: &IsoMsg, raw_msg: &Vec<u8>, iso_resp_msg: &mut IsoMsg) -
                 error!("failed to verify mac. Reason: {}", e.msg);
                 iso_resp_msg.set("message_type", "1110").unwrap_or_default();
                 iso_resp_msg.set_on(39, "916").unwrap_or_default();
-                iso_resp_msg.echo_from(&iso_msg, &[2, 3, 4, 11, 14, 19, 96]);
+                iso_resp_msg.echo_from(&iso_msg, &[2, 3, 4, 11, 14, 19, 96]).unwrap_or_default();
                 return Ok(());
             }
         }
@@ -126,7 +128,7 @@ fn handle_1100(iso_msg: &IsoMsg, raw_msg: &Vec<u8>, iso_resp_msg: &mut IsoMsg) -
                     let f52 = iso_msg.bmp_child_value(52).unwrap();
                     debug!("{}", "verifying pin ... ");
                     match verify_pin(&ISO0, "1234", &hex::decode(f52).unwrap(),
-                                     iso_msg.bmp_child_value(2).unwrap().as_str(), "e0f4543f3e2a2c5ffc7e5e5a222e3e4d") {
+                                     iso_msg.bmp_child_value(2).unwrap().as_str(), &key) {
                         Ok(res) => {
                             if res {
                                 debug!("{}", "PIN verified OK.");

@@ -9,8 +9,6 @@ mod tests {
     use crate::crypto::mac::PaddingType::Type1;
 
     use log;
-    use simplelog;
-    use std::env::join_paths;
     use std::path::Path;
     use std::thread::sleep;
     use std::time::Duration;
@@ -77,7 +75,7 @@ mod tests {
             }
         }
 
-        sleep(Duration::from_secs(60));
+        sleep(Duration::from_secs(5));
         client.close();
         Ok(())
     }

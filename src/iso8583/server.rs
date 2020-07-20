@@ -111,7 +111,7 @@ fn new_client(iso_server: &ISOServer, stream_: TcpStream) {
                 match server.mli.is_available(&stream) {
                     Ok(true) => true,
                     Ok(false) => false,
-                    Err(e) => break 'done,
+                    Err(_e) => break 'done,
                 };
 
                 match server.mli.parse(&mut reader) {
