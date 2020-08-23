@@ -26,8 +26,12 @@ impl MsgProcessor for SampleMsgProcessor {
     fn process(&self, iso_server: &ISOServer, msg: &mut Vec<u8>) -> Result<(Vec<u8>, IsoMsg), IsoError> {
         match iso_server.spec.parse(msg) {
             Ok(iso_msg) => {
+                let t1 = std::time::Instant::now();
                 debug!("parsed incoming request - message = \"{}\" successfully. \n : parsed message: \n --- \n {} \n ----\n",
                        iso_msg.msg.name(), iso_msg);
+
+                iso_server.txn_rate_metric().mark(1);
+
 
                 let req_msg_type = iso_msg.get_field_value(&"message_type".to_string()).unwrap();
                 let resp_msg_type = if req_msg_type == "1100" {
@@ -51,7 +55,18 @@ impl MsgProcessor for SampleMsgProcessor {
 
 
                 match iso_resp_msg.assemble() {
-                    Ok(resp_data) => Ok((resp_data, iso_resp_msg)),
+                    Ok(resp_data) =>
+                        {
+                            let t2 = t1.elapsed();
+                            iso_server.response_time_metric().update(t2.as_millis() as i64);
+                            if iso_server.txn_rate_metric().count() % 100 == 0 {
+                                info!("tps: {}, response-time(mean): {} ", iso_server.txn_rate_metric().one_minute_rate(), iso_server.response_time_metric().snapshot().mean())
+                            }
+
+                            info!("stan = {}", iso_resp_msg.bmp_child_value(11).unwrap_or("".to_string()));
+                            Ok((resp_data, iso_resp_msg))
+                        }
+
                     Err(e) => {
                         error!("Failed to assemble response message, dropping message - {}", e.msg);
                         Err(IsoError { msg: format!("error: msg assembly failed..{} ", e.msg) })
@@ -75,7 +90,6 @@ impl MsgProcessor for SampleMsgProcessor {
 //
 //
 fn handle_1100(iso_msg: &IsoMsg, raw_msg: &Vec<u8>, iso_resp_msg: &mut IsoMsg) -> Result<(), IsoError> {
-
     let key = hex_l!("e0f4543f3e2a2c5ffc7e5e5a222e3e4d").to_vec();
 
     iso_resp_msg.set("message_type", "1110").unwrap_or_default();

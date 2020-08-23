@@ -3,7 +3,7 @@ use std::io::{BufReader, Read, Write};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::sync::Arc;
 use std::thread::JoinHandle;
-
+use witchcraft_metrics::{Meter, ExponentiallyDecayingReservoir, Histogram};
 use hexdump::hexdump_iter;
 
 use crate::iso8583::IsoError;
@@ -24,6 +24,8 @@ pub struct ISOServer {
     pub spec: &'static crate::iso8583::iso_spec::Spec,
     /// The message processor to be used to handle incoming requests
     pub(crate) msg_processor: Arc<Box<dyn MsgProcessor>>,
+    txn_rate_metric: Meter,
+    response_time_metric: witchcraft_metrics::Histogram,
 }
 
 /// This trait whose implementation is used by the IsoServer to handle incoming requests
@@ -58,13 +60,30 @@ impl ISOServer {
                 let addrs = addrs.iter().filter(|s| s.is_ipv4()).map(|s| *s).collect::<Vec<SocketAddr>>();
 
                 if addrs.len() > 0 {
-                    Ok(ISOServer { sock_addr: addrs, spec, mli, msg_processor: Arc::new(msg_processor) })
+                    Ok(ISOServer {
+                        sock_addr: addrs,
+                        spec,
+                        mli,
+                        msg_processor: Arc::new(msg_processor),
+                        txn_rate_metric: Meter::new(),
+                        response_time_metric: Histogram::new(ExponentiallyDecayingReservoir::new()),
+                    })
                 } else {
                     Err(IsoServerError { msg: format!("invalid host_port: {} : unresolvable?", &host_port) })
                 }
             }
             Err(e) => Err(IsoServerError { msg: format!("invalid host_port: {}: cause: {}", &host_port, e.to_string()) })
         }
+    }
+
+    // Returns the meter for transaction count metric
+    pub fn txn_rate_metric(&self) -> &Meter {
+        &self.txn_rate_metric
+    }
+
+    // Returns the histogram metric for response time
+    pub fn response_time_metric(&self) -> &Histogram {
+        &self.response_time_metric
     }
 
     /// Starts the server in a separate thread
@@ -74,6 +93,8 @@ impl ISOServer {
             spec: self.spec,
             mli: self.mli.clone(),
             msg_processor: self.msg_processor.clone(),
+            txn_rate_metric: Meter::new(),
+            response_time_metric: Histogram::new(ExponentiallyDecayingReservoir::new()),
         };
 
         std::thread::spawn(move || {
@@ -95,6 +116,8 @@ fn new_client(iso_server: &ISOServer, stream_: TcpStream) {
         spec: iso_server.spec,
         mli: iso_server.mli.clone(),
         msg_processor: iso_server.msg_processor.clone(),
+        txn_rate_metric: Meter::new(),
+        response_time_metric: Histogram::new(ExponentiallyDecayingReservoir::new()),
     };
 
     std::thread::spawn(move || {
@@ -102,21 +125,25 @@ fn new_client(iso_server: &ISOServer, stream_: TcpStream) {
         let mut reading_mli = true;
         let mut mli: u32 = 0;
 
-        let mut reader = BufReader::new(&stream);
+        let mut reader = BufReader::with_capacity(10240, &stream);
         let mut writer: Box<dyn Write> = Box::new(&stream);
 
+        let mut t1 = std::time::Instant::now();
         'done:
         loop {
+            debug!(":::::::{}", reader.buffer().len());
+
             if reading_mli {
-                match server.mli.is_available(&stream) {
+                /*match server.mli.is_available(&stream) {
                     Ok(true) => true,
                     Ok(false) => false,
                     Err(_e) => break 'done,
-                };
+                };*/
 
                 match server.mli.parse(&mut reader) {
                     Ok(n) => {
                         mli = n;
+                        t1 = std::time::Instant::now();
                         reading_mli = false;
                     }
                     Err(e) => {
@@ -127,6 +154,7 @@ fn new_client(iso_server: &ISOServer, stream_: TcpStream) {
             } else {
                 if mli > 0 {
                     let mut data = vec![0; mli as usize];
+                    debug!("reading data for mli {} ", mli);
                     match reader.read_exact(&mut data[..]) {
                         Err(e) => {
                             error!("client socket_err: {} {}", stream.peer_addr().unwrap().to_string(), e.to_string());
@@ -135,18 +163,20 @@ fn new_client(iso_server: &ISOServer, stream_: TcpStream) {
                         _ => (),
                     };
 
-                    debug!("received request: \n{}\n len = {}", get_hexdump(&data), mli);
-                    let t1 = std::time::Instant::now();
 
+                    mli = 0;
+                    reading_mli = true;
+
+                    debug!("received request: \n{}\n len = {}", get_hexdump(&data), mli);
                     match server.msg_processor.process(&server, &mut data) {
                         Ok(resp) => {
                             debug!("iso_response : {} \n parsed :\n --- {} \n --- \n", get_hexdump(&resp.0), resp.1);
                             match server.mli.create(&(resp.0).len()) {
                                 Ok(mut resp_data) => {
-                                    debug!("request processing time = {} millis", std::time::Instant::now().duration_since(t1).as_millis());
                                     (&mut resp_data).write_all(resp.0.as_slice()).unwrap();
                                     writer.write_all(resp_data.as_slice()).unwrap();
                                     writer.flush().unwrap();
+                                    info!("request processing time = {} millis", std::time::Instant::now().duration_since(t1).as_millis());
                                 }
                                 Err(e) => {
                                     error!("failed to construct mli {}", e.msg)
@@ -157,8 +187,6 @@ fn new_client(iso_server: &ISOServer, stream_: TcpStream) {
                             error!("failed to handle incoming req - {}", e.msg)
                         }
                     }
-                    mli = 0;
-                    reading_mli = true;
                 }
             }
         }

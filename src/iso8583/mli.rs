@@ -5,7 +5,6 @@ use std::io::{Read, ErrorKind, Error};
 use std::net::{TcpStream};
 
 
-
 pub enum MLIType {
     MLI2E,
     MLI2I,
@@ -48,7 +47,6 @@ fn convert_err(e: &Error) -> IsoError {
 
 impl MLI for MLI2E {
     fn parse(&self, in_buf: &mut dyn Read) -> Result<u32, IsoError> {
-        
         match in_buf.read_u16::<byteorder::BigEndian>() {
             Ok(n) => {
                 Ok(n as u32)
@@ -67,6 +65,8 @@ impl MLI for MLI2E {
 
     fn is_available(&self, stream: &TcpStream) -> Result<bool, IsoError> {
         let mut buf = vec![0; 2];
+
+        //debug!("{}", stream.bytes().count());
 
         match stream.peek(&mut buf) {
             Ok(n) => {

@@ -82,7 +82,7 @@ mod tests {
 
 
     #[test]
-    #[ignore]
+    //#[ignore]
     fn test_send_recv_iso_1420() -> Result<(), IsoError> {
         let path = Path::new(".").join("sample_spec").join("sample_spec.yaml");
         std::env::set_var("SPEC_FILE", path.to_str().unwrap());
@@ -93,7 +93,7 @@ mod tests {
         let mut client = ISOTcpClient::new("localhost:6666", &spec, MLI2E);
 
         //send 10 messages
-        for _ in 1..10 {
+        for _ in 1..1000 {
             let mut iso_msg = iso_spec::new_msg(spec, msg_seg);
 
             iso_msg.set("message_type", "1420").unwrap();
@@ -115,7 +115,11 @@ mod tests {
                     eprintln!("{:?}", e)
                 }
             }
+            sleep(Duration::from_millis(500));
         }
+
+
+
         Ok(())
     }
 }
