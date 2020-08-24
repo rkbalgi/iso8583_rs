@@ -179,7 +179,7 @@ dependencies = [
 
 [[package]]
 name = "iso8583_rs"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "block-modes",
  "byteorder",

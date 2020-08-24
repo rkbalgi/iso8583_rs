@@ -125,21 +125,13 @@ fn new_client(iso_server: &ISOServer, stream_: TcpStream) {
         let mut reading_mli = true;
         let mut mli: u32 = 0;
 
-        let mut reader = BufReader::with_capacity(10240, &stream);
+        let mut reader = BufReader::with_capacity(8192, &stream);
         let mut writer: Box<dyn Write> = Box::new(&stream);
 
         let mut t1 = std::time::Instant::now();
         'done:
         loop {
-            debug!(":::::::{}", reader.buffer().len());
-
             if reading_mli {
-                /*match server.mli.is_available(&stream) {
-                    Ok(true) => true,
-                    Ok(false) => false,
-                    Err(_e) => break 'done,
-                };*/
-
                 match server.mli.parse(&mut reader) {
                     Ok(n) => {
                         mli = n;
@@ -176,7 +168,7 @@ fn new_client(iso_server: &ISOServer, stream_: TcpStream) {
                                     (&mut resp_data).write_all(resp.0.as_slice()).unwrap();
                                     writer.write_all(resp_data.as_slice()).unwrap();
                                     writer.flush().unwrap();
-                                    info!("request processing time = {} millis", std::time::Instant::now().duration_since(t1).as_millis());
+                                    debug!("request processing time = {} millis", std::time::Instant::now().duration_since(t1).as_millis());
                                 }
                                 Err(e) => {
                                     error!("failed to construct mli {}", e.msg)
