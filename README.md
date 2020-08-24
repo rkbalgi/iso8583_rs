@@ -36,9 +36,9 @@ defined on the server. The MsgProcessor applies its logic and generates a respon
 
 
 ## Example Server Application: 
-(from main.rs)
+(Adapted from [main.rs](https://github.com/rkbalgi/iso8583-server/blob/master/src/main.rs) )
 
-``` rust
+```rust
 use hex;
 use log::{info, debug, error, warn};
 use simplelog;
