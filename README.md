@@ -5,7 +5,7 @@ ISO8583 library written in Rust
 ![Crates.io](https://img.shields.io/crates/d/iso8583_rs?style=flat-square)
 [![Build Status](https://travis-ci.org/rkbalgi/iso8583_rs.svg?branch=master)](https://travis-ci.org/rkbalgi/iso8583_rs)
 
-__Early days., No promise of backward compatibility for v0.1.* :)__
+Here is a sample implementation of an ISO8583 server using this library - https://github.com/rkbalgi/iso8583-server
 
 ### New in 0.1.7
 * Support for building PIN blocks (F52) in ISO0,ISO1,ISO2,ISO3 formats
